@@ -1,14 +1,125 @@
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-model User {
-  id    Int    @id @default(autoincrement())
-  name  String
-  email String @unique
+model Rol {
+  id           Int       @id @default(autoincrement())
+  nombre       String    @unique @db.VarChar(50)
+  cantidadMfa  Int       @map("cantidad_mfa") // 1, 2 o 3
+  
+  usuarios     Usuario[]
+
+  @@map("roles")
+}
+
+model Persona {
+  id              Int       @id @default(autoincrement())
+  nombres         String    @db.VarChar(255)
+  apellidoPaterno String    @map("apellido_paterno") @db.VarChar(255)
+  apellidoMaterno String    @map("apellido_materno") @db.VarChar(255)
+  fechaNacimiento DateTime  @map("fecha_nacimiento") @db.Date
+  genero          String?   @db.VarChar(20)
+  curp            String    @unique @db.VarChar(18)
+  rfc             String    @unique @db.VarChar(13)
+  telefono        String    @db.VarChar(15)
+  ine             String    @db.VarChar(255)
+  estado          String    @db.VarChar(100)
+  municipio       String    @db.VarChar(100)
+  colonia         String    @db.VarChar(100)
+  codigoPostal    String    @map("codigo_postal") @db.VarChar(6)
+  calle           String    @db.VarChar(100)
+  numeroExterior  String    @map("numero_exterior") @db.VarChar(10)
+  referencia      String?   @db.Text
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at") // Cambiado a opcional sin default(now)
+
+  usuarios        Usuario[]
+
+  @@map("personas")
+}
+
+model Usuario {
+  id                Int       @id @default(autoincrement())
+  rolId             Int       @map("rol_id")
+  personaId         Int       @map("persona_id")
+  username          String    @unique @db.VarChar(30)
+  email             String    @unique @db.VarChar(255)
+  password          String    @db.VarChar(255)
+  activo            Boolean   @default(true)
+  intentosFallidos  Int       @default(0) @map("intentos_fallidos")
+  bloqueadoHasta    DateTime? @map("bloqueado_hasta")
+  ipUltimoIntento   String?   @map("ip_ultimo_intento") @db.VarChar(45)
+  
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  rol               Rol       @relation(fields: [rolId], references: [id])
+  persona           Persona   @relation(fields: [personaId], references: [id])
+  
+  totpSecrets       TotpSecret[]
+  securityQuestions SecurityQuestion[]
+  loginAttempts     LoginAttempt[]
+
+  @@map("usuarios")
+}
+
+model TotpSecret {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+  secretEncrypted String    @map("secret_encrypted") @db.Text
+  confirmed       Boolean   @default(false)
+  recoveryCodes   String[]  @map("recovery_codes")
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  usuario         Usuario   @relation(fields: [userId], references: [id])
+
+  @@map("totp_secrets")
+}
+
+model SecurityQuestion {
+  id             Int       @id @default(autoincrement())
+  userId         Int       @map("user_id")
+  question       String    @db.Text
+  answerHash     String    @map("answer_hash") @db.Text
+  failedAttempts Int       @default(0) @map("failed_attempts")
+  lockedUntil    DateTime? @map("locked_until")
+  
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  usuario        Usuario   @relation(fields: [userId], references: [id])
+
+  @@map("security_questions")
+}
+
+model LoginAttempt {
+  id             Int       @id @default(autoincrement())
+  userId         Int       @map("user_id")
+  emailAttempted String    @map("email_attempted") @db.VarChar(255)
+  factorFailed   Int       @map("factor_failed") // 1, 2 o 3
+  success        Boolean
+  ipAddress      String    @map("ip_address") @db.VarChar(45)
+  userAgent      String?   @map("user_agent") @db.Text
+  
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  usuario        Usuario   @relation(fields: [userId], references: [id])
+
+  @@index([ipAddress, createdAt]) // Índice añadido para búsquedas rápidas de rate limiting
+  @@index([userId, createdAt])
+  
+  @@map("login_attempts")
 }
