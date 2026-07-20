@@ -105,7 +105,7 @@ model SecurityQuestion {
 
 model LoginAttempt {
   id             Int       @id @default(autoincrement())
-  userId         Int       @map("user_id")
+  userId         Int?      @map("user_id")
   emailAttempted String    @map("email_attempted") @db.VarChar(255)
   factorFailed   Int       @map("factor_failed") // 1, 2 o 3
   success        Boolean
@@ -116,7 +116,7 @@ model LoginAttempt {
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
 
-  usuario        Usuario   @relation(fields: [userId], references: [id])
+  usuario        Usuario?  @relation(fields: [userId], references: [id])
 
   @@index([ipAddress, createdAt]) // Índice añadido para búsquedas rápidas de rate limiting
   @@index([userId, createdAt])

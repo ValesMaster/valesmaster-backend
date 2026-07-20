@@ -4,6 +4,8 @@ import { connectMongo } from './lib/mongo';
 import prisma from './lib/prisma';
 import mongoose from 'mongoose';
 
+import authRoutes from './routes/auth.routes'
+
 dotenv.config();
 
 const app = express();
@@ -14,6 +16,8 @@ app.use(express.json());
 app.get('/', (req: Request, res: Response) => {
     res.send('OK');
 });
+
+app.use('/api/auth', authRoutes);
 
 const start = async () => {
     await connectMongo();
