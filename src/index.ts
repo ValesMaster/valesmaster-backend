@@ -4,7 +4,8 @@ import { connectMongo } from './lib/mongo';
 import prisma from './lib/prisma';
 import mongoose from 'mongoose';
 
-import authRoutes from './routes/auth.routes'
+import authRoutes from './routes/auth.routes';
+import totpRoutes from './routes/totp.routes';
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/totp', totpRoutes);
 
 const start = async () => {
     await connectMongo();
@@ -28,6 +30,7 @@ const start = async () => {
 
     const gracefulShutdown = async () => {
         console.log('\nCerrando el servidor y las conexiones a bases de datos...');
+
         await mongoose.connection.close();
         console.log('MongoDB desconectado.');
 
