@@ -39,7 +39,7 @@ export const registerTest = async (req: Request, res: Response) => {
                 },
                 persona: {
                     create: {
-                        nombres,
+                        nombre: nombres,
                         apellidoPaterno,
                         apellidoMaterno,
                         fechaNacimiento: new Date(fechaNacimiento),
@@ -48,13 +48,17 @@ export const registerTest = async (req: Request, res: Response) => {
                         rfc,
                         telefono,
                         ine,
-                        estado,
-                        municipio,
-                        colonia,
-                        codigoPostal,
-                        calle,
-                        numeroExterior,
-                        referencia
+                        direccion: {
+                            create: {
+                                estado,
+                                municipio,
+                                colonia,
+                                codigoPostal,
+                                calle,
+                                numeroExterior,
+                                referencia
+                            }
+                        }
                     }
                 }
             },
@@ -73,7 +77,7 @@ export const registerTest = async (req: Request, res: Response) => {
                 rol: newUser.rol.nombre,
                 mfaRequerido: newUser.rol.cantidadMfa,
                 persona: {
-                    nombreCompleto: `${newUser.persona.nombres} ${newUser.persona.apellidoPaterno} ${newUser.persona.apellidoMaterno}`,
+                    nombreCompleto: `${newUser.persona.nombre} ${newUser.persona.apellidoPaterno} ${newUser.persona.apellidoMaterno}`,
                     curp: newUser.persona.curp,
                     rfc: newUser.persona.rfc
                 }

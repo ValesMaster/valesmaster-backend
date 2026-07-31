@@ -45,7 +45,7 @@ export const setupTotp = async (req: Request, res: Response) => {
             data: {
                 userId: user.id,
                 secretEncrypted: secret.base32,
-                recoveryCodes
+                recoveryCodes: recoveryCodes.join(',')
             }
         });
 

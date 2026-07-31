@@ -7,81 +7,87 @@ generator client {
 }
 
 model Rol {
-  id           Int       @id @default(autoincrement())
-  nombre       String    @unique @db.VarChar(50)
-  cantidadMfa  Int       @map("cantidad_mfa") // 1, 2 o 3
-  
-  usuarios     Usuario[]
+  id          Int     @id @default(autoincrement())
+  nombre      String  @db.VarChar(50)
+  cantidadMfa Int     @map("cantidad_mfa")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  usuarios Usuario[]
 
   @@map("roles")
 }
 
 model Persona {
-  id              Int       @id @default(autoincrement())
-  nombres         String    @db.VarChar(255)
-  apellidoPaterno String    @map("apellido_paterno") @db.VarChar(255)
-  apellidoMaterno String    @map("apellido_materno") @db.VarChar(255)
-  fechaNacimiento DateTime  @map("fecha_nacimiento") @db.Date
-  genero          String?   @db.VarChar(20)
-  curp            String    @unique @db.VarChar(18)
-  rfc             String    @unique @db.VarChar(13)
-  telefono        String    @db.VarChar(15)
-  ine             String    @db.VarChar(255)
-  estado          String    @db.VarChar(100)
-  municipio       String    @db.VarChar(100)
-  colonia         String    @db.VarChar(100)
-  codigoPostal    String    @map("codigo_postal") @db.VarChar(6)
-  calle           String    @db.VarChar(100)
-  numeroExterior  String    @map("numero_exterior") @db.VarChar(10)
-  referencia      String?   @db.Text
-  
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  deletedAt       DateTime? @map("deleted_at") // Cambiado a opcional sin default(now)
+  id                 Int       @id @default(autoincrement())
+  nombre             String?   @db.VarChar(100)
+  apellidoPaterno    String?   @map("apellido_paterno") @db.VarChar(100)
+  apellidoMaterno    String?   @map("apellido_materno") @db.VarChar(100)
+  fechaNacimiento    DateTime? @map("fecha_nacimiento") @db.Date
+  telefono           String?   @db.VarChar(20)
+  genero             String?   @db.VarChar(20)
+  curp               String?   @unique @db.VarChar(18)
+  rfc                String?   @unique @db.VarChar(13)
+  ine                String?   @db.VarChar(50)
+  direccionId        Int?      @map("direccion_id")
+  comprobanteDomicilio String? @map("comprobante_domicilio") @db.VarChar(255)
 
-  usuarios        Usuario[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  direccion         Direccion?               @relation(fields: [direccionId], references: [id])
+  usuarios          Usuario[]
+  familiaresDist    FamiliaresDistribuidora[]
+  presolicitudes    Presolicitud[]
+  clientes          Cliente[]
+  presolicitudesFam PresolicitudesFamiliar[] @relation("FamiliarPersona")
 
   @@map("personas")
 }
 
 model Usuario {
-  id                Int       @id @default(autoincrement())
-  rolId             Int       @map("rol_id")
-  personaId         Int       @map("persona_id")
-  username          String    @unique @db.VarChar(30)
-  email             String    @unique @db.VarChar(255)
-  password          String    @db.VarChar(255)
-  activo            Boolean   @default(true)
-  intentosFallidos  Int       @default(0) @map("intentos_fallidos")
-  bloqueadoHasta    DateTime? @map("bloqueado_hasta")
-  ipUltimoIntento   String?   @map("ip_ultimo_intento") @db.VarChar(45)
-  
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  deletedAt         DateTime? @map("deleted_at")
+  id               Int       @id @default(autoincrement())
+  rolId            Int       @map("rol_id")
+  personaId        Int       @map("persona_id")
+  username         String    @unique @db.VarChar(50)
+  email            String    @unique @db.VarChar(255)
+  password         String    @db.VarChar(255)
+  activo           Boolean   @default(true)
+  intentosFallidos Int       @default(0) @map("intentos_fallidos")
+  bloqueadoHasta   DateTime? @map("bloqueado_hasta")
+  ipUltimoIntento  String?   @map("ip_ultimo_intento") @db.VarChar(45)
 
-  rol               Rol       @relation(fields: [rolId], references: [id])
-  persona           Persona   @relation(fields: [personaId], references: [id])
-  
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  rol               Rol                @relation(fields: [rolId], references: [id])
+  persona           Persona            @relation(fields: [personaId], references: [id])
   totpSecrets       TotpSecret[]
   securityQuestions SecurityQuestion[]
   loginAttempts     LoginAttempt[]
+  distribuidoras    Distribuidora[]
+  empleados         Empleado[]
+  notificaciones    Notificacion[]
 
   @@map("usuarios")
 }
 
 model TotpSecret {
-  id              Int       @id @default(autoincrement())
-  userId          Int       @map("user_id")
-  secretEncrypted String    @map("secret_encrypted") @db.Text
-  confirmed       Boolean   @default(false)
-  recoveryCodes   String[]  @map("recovery_codes")
-  
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  deletedAt       DateTime? @map("deleted_at")
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  secretEncrypted String  @map("secret_encrypted") @db.Text
+  confirmed      Boolean  @default(false)
+  recoveryCodes  String?  @map("recovery_codes")
 
-  usuario         Usuario   @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  usuario Usuario @relation(fields: [userId], references: [id])
 
   @@map("totp_secrets")
 }
@@ -92,34 +98,467 @@ model SecurityQuestion {
   question       String    @db.Text
   answerHash     String    @map("answer_hash") @db.Text
   failedAttempts Int       @default(0) @map("failed_attempts")
-  lockedUntil    DateTime? @map("locked_until")
-  
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
+  bloqueadoHasta DateTime? @map("bloqueado_hasta")
 
-  usuario        Usuario   @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  usuario Usuario @relation(fields: [userId], references: [id])
 
   @@map("security_questions")
 }
 
 model LoginAttempt {
-  id             Int       @id @default(autoincrement())
-  userId         Int?      @map("user_id")
-  emailAttempted String    @map("email_attempted") @db.VarChar(255)
-  factorFailed   Int       @map("factor_failed") // 1, 2 o 3
+  id             Int     @id @default(autoincrement())
+  userId         Int?    @map("user_id")
+  emailAttempted String  @map("email_attempted") @db.VarChar(255)
+  factorFailed   Int     @map("factor_failed")
   success        Boolean
-  ipAddress      String    @map("ip_address") @db.VarChar(45)
-  userAgent      String?   @map("user_agent") @db.Text
-  
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
+  ipAddress      String  @map("ip_address") @db.VarChar(45)
+  userAgent      String? @map("user_agent") @db.Text
 
-  usuario        Usuario?  @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
-  @@index([ipAddress, createdAt]) // Índice añadido para búsquedas rápidas de rate limiting
-  @@index([userId, createdAt])
-  
+  usuario Usuario? @relation(fields: [userId], references: [id])
+
   @@map("login_attempts")
+}
+
+model Direccion {
+  id               Int     @id @default(autoincrement())
+  estado           String  @db.VarChar(100)
+  municipio        String  @db.VarChar(100)
+  codigoPostal     String  @map("codigo_postal") @db.VarChar(10)
+  colonia          String  @db.VarChar(100)
+  calle            String  @db.VarChar(100)
+  numeroExterior   String  @map("numero_exterior") @db.VarChar(20)
+  numeroInterior   String? @map("numero_interior") @db.VarChar(20)
+  referencia       String? @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  personas    Persona[]
+  sucursales  Sucursal[]
+
+  @@map("direcciones")
+}
+
+model Sucursal {
+  id          Int     @id @default(autoincrement())
+  nombre      String  @db.VarChar(100)
+  direccionId Int     @map("direccion_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  direccion Direccion @relation(fields: [direccionId], references: [id])
+  empleados Empleado[]
+
+  @@map("sucursales")
+}
+
+model Empleado {
+  id         Int @id @default(autoincrement())
+  sucursalId Int @map("sucursal_id")
+  usuarioId  Int @map("usuario_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  sucursal           Sucursal       @relation(fields: [sucursalId], references: [id])
+  usuario            Usuario        @relation(fields: [usuarioId], references: [id])
+  validadorPresol    Presolicitud[] @relation("ValidadorPresol")
+  coordinadorPresol  Presolicitud[] @relation("CoordinadorPresol")
+  gerenteSol         Solicitud[]    @relation("GerenteSol")
+  canjesPuntos       CanjePuntos[]
+
+  @@map("empleados")
+}
+
+model Distribuidora {
+  id                   Int       @id @default(autoincrement())
+  usuarioId            Int       @map("usuario_id")
+  categoria            String?   @db.VarChar(50)
+  estadoCivil          String?   @map("estado_civil") @db.VarChar(50)
+  fechaNacimiento      DateTime? @map("fecha_nacimiento") @db.Date
+  comprobanteDomicilio String?   @map("comprobante_domicilio") @db.VarChar(255)
+  puntos               Decimal?  @db.Decimal(12, 2)
+  limiteCredito        Decimal?  @map("limite_credito") @db.Decimal(12, 2)
+  creditoUsado         Decimal?  @map("credito_usado") @db.Decimal(12, 2)
+  cantidadLiquidada    Decimal?  @map("cantidad_liquidada") @db.Decimal(12, 2)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  usuario              Usuario                   @relation(fields: [usuarioId], references: [id])
+  familiares           FamiliaresDistribuidora[]
+  vehiculos            VehiculosDistribuidora[]
+  negocios             NegociosDistribuidora[]
+  vales                Vale[]
+  canjesPuntos         CanjePuntos[]
+  prevales             Prevale[]
+  creditos             Credito[]
+
+  @@map("distribuidoras")
+}
+
+model Auditoria {
+  id Int @id @default(autoincrement())
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("auditorias")
+}
+
+model FamiliaresDistribuidora {
+  id               Int     @id @default(autoincrement())
+  distribuidoraId  Int     @map("ditribuidora_id")
+  personaId        Int     @map("persona_id")
+  relacion         String? @db.VarChar(50)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  distribuidora Distribuidora @relation(fields: [distribuidoraId], references: [id])
+  persona       Persona       @relation(fields: [personaId], references: [id])
+
+  @@map("familiares_distribuidoras")
+}
+
+model Vehiculo {
+  id          Int     @id @default(autoincrement())
+  marca       String? @db.VarChar(50)
+  modelo      String? @db.VarChar(50)
+  placas      String? @db.VarChar(20)
+  ano         String? @db.VarChar(10)
+  color       String? @db.VarChar(30)
+  tipoVehiculo String? @map("tipo_vehiculo") @db.VarChar(50)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  vehiculosDist        VehiculosDistribuidora[]
+  presolicitudesVeh    PresolicitudesVehiculo[]
+
+  @@map("vehiculos")
+}
+
+model VehiculosDistribuidora {
+  id              Int @id @default(autoincrement())
+  vehiculoId      Int @map("vehiculo_id")
+  distribuidoraId Int @map("distribuidora_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  vehiculo      Vehiculo      @relation(fields: [vehiculoId], references: [id])
+  distribuidora Distribuidora @relation(fields: [distribuidoraId], references: [id])
+
+  @@map("vehiculos_distribuidoras")
+}
+
+model Negocio {
+  id       Int     @id @default(autoincrement())
+  nombre   String? @db.VarChar(100)
+  sucursal String? @db.VarChar(100)
+  telefono String? @db.VarChar(20)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  negociosDist        NegociosDistribuidora[]
+  presolicitudesNeg   PresolicitudesNegocio[]
+
+  @@map("negocios")
+}
+
+model NegociosDistribuidora {
+  id              Int           @id @default(autoincrement())
+  negocioId       Int           @map("negocio_id")
+  distribuidoraId Int           @map("distribuidora_id")
+  cartaConstancia String?       @map("carta_constancia") @db.VarChar(255)
+  antiguedad      DateTime?     @db.Time
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  negocio       Negocio       @relation(fields: [negocioId], references: [id])
+  distribuidora Distribuidora @relation(fields: [distribuidoraId], references: [id])
+
+  @@map("negocios_distribuidoras")
+}
+
+model Notificacion {
+  id       Int     @id @default(autoincrement())
+  userId   Int     @map("user_id")
+  tipo     String? @db.VarChar(50)
+  titulo   String? @db.VarChar(100)
+  mensaje  String? @db.Text
+  estado   String? @db.VarChar(50)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  usuario  Usuario @relation(fields: [userId], references: [id])
+
+  @@map("notificaciones")
+}
+
+model Presolicitud {
+  id               Int     @id @default(autoincrement())
+  folio            String? @unique @db.VarChar(50)
+  personaId        Int     @map("persona_id")
+  validadorId      Int?    @map("validador_id")
+  coordinadorId    Int?    @map("coordinador_id")
+  estado           String? @db.VarChar(50)
+  correoSolicitante String? @map("correo_solicitante") @db.VarChar(255)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  persona       Persona                  @relation(fields: [personaId], references: [id])
+  validador     Empleado?                @relation("ValidadorPresol", fields: [validadorId], references: [id])
+  coordinador   Empleado?                @relation("CoordinadorPresol", fields: [coordinadorId], references: [id])
+  familiares    PresolicitudesFamiliar[]
+  vehiculos     PresolicitudesVehiculo[]
+  negocios      PresolicitudesNegocio[]
+  solicitudes   Solicitud[]
+
+  @@map("presolicitudes")
+}
+
+model PresolicitudesFamiliar {
+  id             Int @id @default(autoincrement())
+  presolicitudId Int @map("presolicitud_id")
+  familiarId     Int @map("familiar_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  presolicitud Presolicitud @relation(fields: [presolicitudId], references: [id])
+  familiar     Persona      @relation("FamiliarPersona", fields: [familiarId], references: [id])
+
+  @@map("presolicitudes_familiares")
+}
+
+model PresolicitudesVehiculo {
+  id             Int @id @default(autoincrement())
+  presolicitudId Int @map("presolicitud_id")
+  vehiculoId     Int @map("vehiculo_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  presolicitud Presolicitud @relation(fields: [presolicitudId], references: [id])
+  vehiculo     Vehiculo     @relation(fields: [vehiculoId], references: [id])
+
+  @@map("presolicitudes_vehiculos")
+}
+
+model PresolicitudesNegocio {
+  id             Int       @id @default(autoincrement())
+  presolicitudId Int       @map("presolicitud_id")
+  negocioId      Int       @map("negocio_id")
+  carta          String?   @db.Text
+  antiguedad     DateTime? @db.Time
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  presolicitud Presolicitud @relation(fields: [presolicitudId], references: [id])
+  negocio      Negocio      @relation(fields: [negocioId], references: [id])
+
+  @@map("presolicitudes_negocios")
+}
+
+model Solicitud {
+  id             Int     @id @default(autoincrement())
+  presolicitudId Int     @map("presolicitud_id")
+  gerenteId      Int?    @map("gerente_id")
+  estado         String? @db.VarChar(50)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  presolicitud Presolicitud @relation(fields: [presolicitudId], references: [id])
+  gerente      Empleado?    @relation("GerenteSol", fields: [gerenteId], references: [id])
+
+  @@map("solicitudes")
+}
+
+model Cliente {
+  id           Int     @id @default(autoincrement())
+  personaId    Int     @map("persona_id")
+  estado       String? @db.VarChar(50)
+  observaciones String? @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  persona  Persona   @relation(fields: [personaId], references: [id])
+  vales    Vale[]
+  prevales Prevale[]
+
+  @@map("clientes")
+}
+
+model Prevale {
+  id                 Int       @id @default(autoincrement())
+  clienteId          Int       @map("cliente_id")
+  distribuidoraId    Int       @map("distribuidora_id")
+  cantidadSolicitada Decimal   @map("cantidad_solicitada") @db.Decimal(12, 2)
+  plazos             Int
+  tipoVale           String    @map("tipo_vale") @db.VarChar(50)
+  estado             String    @db.VarChar(50)
+  motivoRechazo      String?   @map("motivo_rechazo") @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  cliente          Cliente               @relation(fields: [clienteId], references: [id])
+  distribuidora    Distribuidora         @relation(fields: [distribuidoraId], references: [id])
+  vales            Vale[]
+  detallesPagos    PrevaleDetallePago[]
+
+  @@map("prevales")
+}
+
+model PrevaleDetallePago {
+  id                   Int       @id @default(autoincrement())
+  prevaleId            Int       @map("prevale_id")
+  quincena             Int
+  fechaCorteEstimada   DateTime  @map("fecha_corte_estimada") @db.Date
+  cantidadEstimada     Decimal   @map("cantidad_estimada") @db.Decimal(12, 2)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  prevale Prevale @relation(fields: [prevaleId], references: [id])
+
+  @@map("prevales_detalle_pagos")
+}
+
+model Vale {
+  id                   Int       @id @default(autoincrement())
+  prevaleId            Int?      @map("prevale_id")
+  clienteId            Int       @map("cliente_id")
+  distribuidoraId      Int       @map("distribuidora_id")
+  cantidadPrestada     Decimal   @map("cantidad_prestada") @db.Decimal(12, 2)
+  cantidadPagada       Decimal   @map("cantidad_pagada") @db.Decimal(12, 2)
+  estado               String    @db.VarChar(50)
+  plazos               Int
+  tipoVale             String    @map("tipo_vale") @db.VarChar(50)
+  porcentajeComision   Decimal   @map("porcentaje_comision") @db.Decimal(5, 2)
+  gananciaDistribuidora Decimal  @map("ganancia_distribuidora") @db.Decimal(12, 2)
+  montoSeguro          Decimal   @map("monto_seguro") @db.Decimal(12, 2)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  prevale       Prevale?       @relation(fields: [prevaleId], references: [id])
+  cliente       Cliente        @relation(fields: [clienteId], references: [id])
+  distribuidora Distribuidora  @relation(fields: [distribuidoraId], references: [id])
+  pagos         Pago[]
+
+  @@map("vales")
+}
+
+model Pago {
+  id                 Int       @id @default(autoincrement())
+  valeId             Int       @map("vale_id")
+  quincena           Int
+  estado             String    @db.VarChar(50)
+  fechaCorte         DateTime  @map("fecha_corte") @db.Date
+  fechaPago          DateTime? @map("fecha_pago") @db.Date
+  cantidadAPagar     Decimal   @map("cantidad_a_pagar") @db.Decimal(12, 2)
+  cantidadPagada     Decimal   @map("cantidad_pagada") @db.Decimal(12, 2)
+  multaGenerada      Decimal?  @map("multa_generada") @db.Decimal(12, 2)
+  estadoMulta        String?   @map("estado_multa") @db.VarChar(50)
+  tipoComportamiento String?   @map("tipo_comportamiento") @db.VarChar(50)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  vale Vale @relation(fields: [valeId], references: [id])
+
+  @@map("pagos")
+}
+
+model CanjePuntos {
+  id               Int     @id @default(autoincrement())
+  distribuidoraId  Int     @map("distribuidora_id")
+  cajeroId         Int     @map("cajero_id")
+  cantidadCanjeada Decimal @map("cantidad_canjeada") @db.Decimal(12, 2)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  distribuidora Distribuidora @relation(fields: [distribuidoraId], references: [id])
+  cajero        Empleado      @relation(fields: [cajeroId], references: [id])
+
+  @@map("canjes_puntos")
+}
+
+model Credito {
+  id                Int     @id @default(autoincrement())
+  distribuidoraId   Int     @map("distribuidora_id")
+  cantidadUsada     Decimal @map("cantidad_usada") @db.Decimal(12, 2)
+  cantidadLiquidada Decimal @map("cantidad_liquidada") @db.Decimal(12, 2)
+  plazos            Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  distribuidora    Distribuidora          @relation(fields: [distribuidoraId], references: [id])
+  pagosDistribuidor PagosDistribuidora[]
+
+  @@map("creditos")
+}
+
+model PagosDistribuidora {
+  id             Int       @id @default(autoincrement())
+  relacionId     Int       @map("relacion_id")
+  referencia     String    @unique @db.VarChar(100)
+  cantidadPagada Decimal   @map("cantidad_pagada") @db.Decimal(12, 2)
+  cantidadAPagar Decimal   @map("cantidad_a_pagar") @db.Decimal(12, 2)
+  metodoPago     String    @map("metodo_pago") @db.VarChar(50)
+  plazo          Int
+  fechaPago      DateTime? @map("fecha_pago") @db.Date
+  fechaCorte     DateTime  @map("fecha_corte") @db.Date
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  credito Credito @relation(fields: [relacionId], references: [id])
+
+  @@map("pagos_distribuidoras")
 }
