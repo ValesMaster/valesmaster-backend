@@ -8,7 +8,7 @@ generator client {
 
 model Rol {
   id          Int     @id @default(autoincrement())
-  nombre      String  @db.VarChar(50)
+  nombre      String  @unique @db.VarChar(50)
   cantidadMfa Int     @map("cantidad_mfa")
 
   createdAt DateTime  @default(now()) @map("created_at")
@@ -158,6 +158,8 @@ model Sucursal {
 
   direccion Direccion @relation(fields: [direccionId], references: [id])
   empleados Empleado[]
+  distribuidoras Distribuidora[]
+  presolicitudes Presolicitud[]
 
   @@map("sucursales")
 }
@@ -184,6 +186,7 @@ model Empleado {
 model Distribuidora {
   id                   Int       @id @default(autoincrement())
   usuarioId            Int       @map("usuario_id")
+  sucursalId          Int       @map("sucursal_id")
   categoria            String?   @db.VarChar(50)
   estadoCivil          String?   @map("estado_civil") @db.VarChar(50)
   fechaNacimiento      DateTime? @map("fecha_nacimiento") @db.Date
@@ -198,6 +201,7 @@ model Distribuidora {
   deletedAt DateTime? @map("deleted_at")
 
   usuario              Usuario                   @relation(fields: [usuarioId], references: [id])
+  sucursal             Sucursal                  @relation(fields: [sucursalId], references: [id])
   familiares           FamiliaresDistribuidora[]
   vehiculos            VehiculosDistribuidora[]
   negocios             NegociosDistribuidora[]
@@ -296,6 +300,7 @@ model Presolicitud {
   id               Int     @id @default(autoincrement())
   folio            String? @unique @db.VarChar(50)
   personaId        Int     @map("persona_id")
+  sucursalId       Int     @map("sucursal_id")
   validadorId      Int?    @map("validador_id")
   coordinadorId    Int?    @map("coordinador_id")
   estado           String? @db.VarChar(50)
@@ -306,6 +311,7 @@ model Presolicitud {
   deletedAt DateTime? @map("deleted_at")
 
   persona       Persona                  @relation(fields: [personaId], references: [id])
+  sucursal      Sucursal                 @relation(fields: [sucursalId], references: [id])
   validador     Empleado?                @relation("ValidadorPresol", fields: [validadorId], references: [id])
   coordinador   Empleado?                @relation("CoordinadorPresol", fields: [coordinadorId], references: [id])
   familiares    PresolicitudesFamiliar[]
