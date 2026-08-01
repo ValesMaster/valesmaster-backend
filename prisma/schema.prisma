@@ -71,7 +71,6 @@ model Usuario {
   loginAttempts     LoginAttempt[]
   distribuidoras    Distribuidora[]
   empleados         Empleado[]
-  notificaciones    Notificacion[]
 
   @@map("usuarios")
 }
@@ -210,16 +209,6 @@ model Distribuidora {
   @@map("distribuidoras")
 }
 
-model Auditoria {
-  id Int @id @default(autoincrement())
-
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
-
-  @@map("auditorias")
-}
-
 model FamiliaresDistribuidora {
   id               Int     @id @default(autoincrement())
   distribuidoraId  Int     @map("ditribuidora_id")
@@ -301,23 +290,6 @@ model NegociosDistribuidora {
   distribuidora Distribuidora @relation(fields: [distribuidoraId], references: [id])
 
   @@map("negocios_distribuidoras")
-}
-
-model Notificacion {
-  id       Int     @id @default(autoincrement())
-  userId   Int     @map("user_id")
-  tipo     String? @db.VarChar(50)
-  titulo   String? @db.VarChar(100)
-  mensaje  String? @db.Text
-  estado   String? @db.VarChar(50)
-
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
-
-  usuario  Usuario @relation(fields: [userId], references: [id])
-
-  @@map("notificaciones")
 }
 
 model Presolicitud {
