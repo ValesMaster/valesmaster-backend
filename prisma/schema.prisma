@@ -500,6 +500,7 @@ model Pago {
   multaGenerada      Decimal?  @map("multa_generada") @db.Decimal(12, 2)
   estadoMulta        String?   @map("estado_multa") @db.VarChar(50)
   tipoComportamiento String?   @map("tipo_comportamiento") @db.VarChar(50)
+  cuenta_destino     String    @map("cuenta_destino") @db.VarChar(30)
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -553,6 +554,7 @@ model PagosDistribuidora {
   plazo          Int
   fechaPago      DateTime? @map("fecha_pago") @db.Date
   fechaCorte     DateTime  @map("fecha_corte") @db.Date
+  cuentaDestino  String    @map("cuenta_destino") @db.VarChar(30)
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
