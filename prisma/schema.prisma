@@ -188,8 +188,6 @@ model Distribuidora {
   usuarioId            Int       @map("usuario_id")
   sucursalId          Int       @map("sucursal_id")
   categoria            String?   @db.VarChar(50)
-  estadoCivil          String?   @map("estado_civil") @db.VarChar(50)
-  fechaNacimiento      DateTime? @map("fecha_nacimiento") @db.Date
   comprobanteDomicilio String?   @map("comprobante_domicilio") @db.VarChar(255)
   puntos               Decimal?  @db.Decimal(12, 2)
   limiteCredito        Decimal?  @map("limite_credito") @db.Decimal(12, 2)
@@ -326,6 +324,7 @@ model PresolicitudesFamiliar {
   id             Int @id @default(autoincrement())
   presolicitudId Int @map("presolicitud_id")
   familiarId     Int @map("familiar_id")
+  relacion       String @db.VarChar(30)
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
