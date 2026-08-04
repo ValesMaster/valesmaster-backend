@@ -238,7 +238,7 @@ export const validarPresolicitud = async (req: Request, res: Response) => {
     }
 }
 
-export const AprobarSolicitud = async (req: Request, res: Response) => {
+export const aprobarSolicitud = async (req: Request, res: Response) => {
     const { id } = req.params;
     const {
         estado, gerente_id,
@@ -390,3 +390,261 @@ export const AprobarSolicitud = async (req: Request, res: Response) => {
         });
     }
 }
+
+export const getPresolicitudes = async (req: Request, res: Response) => {
+    try {
+        const { page = '1', limit = '10', estado, sucursal_id, search } = req.query;
+
+        const pageNumber = parseInt(page as string, 10);
+        const limitNumber = parseInt(limit as string, 10);
+        const skip = (pageNumber - 1) * limitNumber;
+
+        const whereClause: any = {};
+
+        if (estado) {
+            whereClause.estado = String(estado).toUpperCase();
+        }
+
+        if (sucursal_id) {
+            whereClause.sucursalId = Number(sucursal_id);
+        }
+
+        if (search) {
+            whereClause.OR = [
+                { folio: { contains: String(search), mode: 'insensitive' } },
+                { correoSolicitante: { contains: String(search), mode: 'insensitive' } },
+                {
+                    persona: {
+                        OR: [
+                            { nombre: { contains: String(search), mode: 'insensitive' } },
+                            { apellidoPaterno: { contains: String(search), mode: 'insensitive' } },
+                            { curp: { contains: String(search), mode: 'insensitive' } }
+                        ]
+                    }
+                }
+            ];
+        }
+
+        const [presolicitudes, total] = await Promise.all([
+            prisma.presolicitud.findMany({
+                where: whereClause,
+                skip: skip,
+                take: limitNumber,
+                select: {
+                    id: true,
+                    folio: true,
+                    estado: true,
+                    correoSolicitante: true,
+                    persona: {
+                        select: {
+                            nombre: true,
+                            apellidoPaterno: true,
+                            apellidoMaterno: true
+                        }
+                    },
+                    sucursal: {
+                        select: {
+                            nombre: true
+                        }
+                    },
+                    validador: {
+                        select: {
+                            id: true,
+                            usuario: {
+                                select: { username: true }
+                            }
+                        }
+                    },
+                    coordinador: {
+                        select: {
+                            id: true,
+                            usuario: {
+                                select: { username: true }
+                            }
+                        }
+                    },
+                    createdAt: true
+                },
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma.presolicitud.count({ where: whereClause })
+        ]);
+
+        const presolicitudesFormateadas = presolicitudes.map(p => ({
+            id: p.id,
+            folio: p.folio,
+            nombreSolicitante: p.persona
+                ? `${p.persona.nombre || ''} ${p.persona.apellidoPaterno || ''} ${p.persona.apellidoMaterno || ''}`.trim()
+                : 'Sin nombre',
+            sucursal: p.sucursal?.nombre || 'Sin sucursal',
+            validador: p.validador?.usuario?.username || 'No asignado',
+            coordinador: p.coordinador?.usuario?.username || 'No asignado',
+            estado: p.estado,
+            correoSolicitante: p.correoSolicitante,
+            createdAt: p.createdAt
+        }));
+
+        return res.status(200).json({
+            message: "Presolicitudes obtenidas con éxito",
+            data: presolicitudesFormateadas,
+            pagination: {
+                totalItems: total,
+                totalPages: Math.ceil(total / limitNumber),
+                currentPage: pageNumber,
+                limit: limitNumber
+            }
+        });
+
+    } catch (error: any) {
+        console.error("Error al obtener presolicitudes: ", error);
+        return res.status(500).json({
+            message: "Error al obtener presolicitudes",
+            error: error.message
+        });
+    }
+};
+
+export const getSolicitudes = async (req: Request, res: Response) => {
+    try {
+        const { page = '1', limit = '10', estado, gerente_id } = req.query;
+
+        const pageNumber = parseInt(page as string, 10);
+        const limitNumber = parseInt(limit as string, 10);
+        const skip = (pageNumber - 1) * limitNumber;
+
+        const whereClause: any = {};
+
+        if (estado) {
+            whereClause.estado = String(estado).toUpperCase();
+        }
+
+        if (gerente_id) {
+            whereClause.gerenteId = Number(gerente_id);
+        }
+
+        const [solicitudes, total] = await Promise.all([
+            prisma.solicitud.findMany({
+                where: whereClause,
+                skip: skip,
+                take: limitNumber,
+                select: {
+                    id: true,
+                    estado: true,
+                    gerenteId: true,
+                    gerente: {
+                        select: {
+                            usuario: {
+                                select: { username: true }
+                            }
+                        }
+                    },
+                    presolicitud: {
+                        select: {
+                            folio: true,
+                            persona: {
+                                select: {
+                                    nombre: true,
+                                    apellidoPaterno: true
+                                }
+                            }
+                        }
+                    },
+                    createdAt: true
+                },
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma.solicitud.count({ where: whereClause })
+        ]);
+
+        const solicitudesFormateadas = solicitudes.map(s => ({
+            id: s.id,
+            folioPresolicitud: s.presolicitud?.folio || 'N/A',
+            nombreSolicitante: s.presolicitud?.persona
+                ? `${s.presolicitud.persona.nombre} ${s.presolicitud.persona.apellidoPaterno}`
+                : 'N/A',
+            gerenteId: s.gerenteId,
+            nombreGerente: s.gerente?.usuario?.username || 'No asignado',
+            estado: s.estado,
+            createdAt: s.createdAt
+        }));
+
+        return res.status(200).json({
+            message: "Solicitudes obtenidas con éxito",
+            data: solicitudesFormateadas,
+            pagination: {
+                totalItems: total,
+                totalPages: Math.ceil(total / limitNumber),
+                currentPage: pageNumber,
+                limit: limitNumber
+            }
+        });
+
+    } catch (error: any) {
+        console.error("Error al obtener solicitudes: ", error);
+        return res.status(500).json({
+            message: "Error al obtener solicitudes",
+            error: error.message
+        });
+    }
+};
+
+export const getPresolicitudDetalle = async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        const presolicitud = await prisma.presolicitud.findUnique({
+            where: { id: Number(id) },
+            include: {
+                persona: {
+                    include: {
+                        direccion: true
+                    }
+                },
+                sucursal: true,
+                validador: {
+                    include: {
+                        usuario: { select: { username: true, email: true } }
+                    }
+                },
+                coordinador: {
+                    include: {
+                        usuario: { select: { username: true, email: true } }
+                    }
+                },
+                vehiculos: {
+                    include: {
+                        vehiculo: true
+                    }
+                },
+                negocios: {
+                    include: {
+                        negocio: true
+                    }
+                },
+                familiares: {
+                    include: {
+                        familiar: true
+                    }
+                }
+            }
+        });
+
+        if (!presolicitud) {
+            return res.status(404).json({
+                message: "Presolicitud no encontrada"
+            });
+        }
+
+        return res.status(200).json({
+            message: "Detalle de presolicitud obtenido con éxito",
+            data: presolicitud
+        });
+
+    } catch (error: any) {
+        console.error("Error al obtener el detalle de la presolicitud: ", error);
+        return res.status(500).json({
+            message: "Error al obtener el detalle de la presolicitud",
+            error: error.message
+        });
+    }
+};
