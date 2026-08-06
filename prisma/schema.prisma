@@ -66,11 +66,13 @@ model Usuario {
 
   rol               Rol                @relation(fields: [rolId], references: [id])
   persona           Persona            @relation(fields: [personaId], references: [id])
-  totpSecrets       TotpSecret[]
-  securityQuestions SecurityQuestion[]
-  loginAttempts     LoginAttempt[]
-  distribuidoras    Distribuidora[]
-  empleados         Empleado[]
+
+totpSecrets          TotpSecret[]
+emailCodes           EmailVerificationCode[]
+securityQuestions    SecurityQuestion[]
+loginAttempts        LoginAttempt[]
+distribuidoras       Distribuidora[]
+empleados            Empleado[]
 
   @@map("usuarios")
 }
@@ -89,6 +91,22 @@ model TotpSecret {
   usuario Usuario @relation(fields: [userId], references: [id])
 
   @@map("totp_secrets")
+}
+
+model EmailVerificationCode {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  code        String    @db.VarChar(6)
+  expiresAt   DateTime  @map("expires_at")
+  used        Boolean   @default(false)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  usuario Usuario @relation(fields: [userId], references: [id])
+
+  @@map("email_verification_codes")
 }
 
 model SecurityQuestion {
