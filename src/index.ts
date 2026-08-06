@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import authRoutes from './routes/auth.routes';
 import totpRoutes from './routes/totp.routes';
 import solicitudesRoutes from './routes/solicitudes.routes';
+import gerentesRoutes from './routes/gerentes.routes';
 
 dotenv.config();
 
@@ -21,7 +22,8 @@ app.get('/', (req: Request, res: Response) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/totp', totpRoutes);
-app.use('/api/solicitud', solicitudesRoutes);
+app.use('/api/solicitudes', solicitudesRoutes);
+app.use('/api/gerentes', gerentesRoutes);
 
 const start = async () => {
     await connectMongo();
