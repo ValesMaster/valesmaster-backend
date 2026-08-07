@@ -1,15 +1,18 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { sendLoginCode } from "../services/email.service";
 import QRCode from "qrcode";
 import prisma from "../lib/prisma";
+
 import {
     generateRecoveryCodes,
     generateTotpSecret,
     verifyTotp
 } from "../services/totp.service";
 
-export const setupTotp = async (req: Request, res: Response) => {
+export const setupTotp = async (
+    req: Request,
+    res: Response
+) => {
 
     try {
 
@@ -96,18 +99,19 @@ export const setupTotp = async (req: Request, res: Response) => {
 
 };
 
-export const enableTotp = async (req: Request, res: Response) => {
+export const enableTotp = async (
+    req: Request,
+    res: Response
+) => {
 
     try {
 
         const auth = req.headers.authorization;
 
         if (!auth) {
-
             return res.status(401).json({
                 message: "Token requerido"
             });
-
         }
 
         const token = auth.split(" ")[1];
@@ -220,27 +224,19 @@ export const verifyTotpLogin = async (
     try {
 
         const {
-
             mfaToken,
-
             code
-
         } = req.body;
 
         const payload: any = jwt.verify(
-
             mfaToken,
-
             process.env.JWT_SECRET!
-
         );
 
         if (payload.step !== "REQUIRE_TOTP") {
 
             return res.status(401).json({
-
                 message: "Token inválido."
-
             });
 
         }
@@ -248,15 +244,11 @@ export const verifyTotpLogin = async (
         const user = await prisma.usuario.findUnique({
 
             where: {
-
                 id: payload.id
-
             },
 
             include: {
-
                 rol: true
-
             }
 
         });
@@ -264,9 +256,7 @@ export const verifyTotpLogin = async (
         if (!user) {
 
             return res.status(404).json({
-
                 message: "Usuario no encontrado."
-
             });
 
         }
@@ -294,19 +284,14 @@ export const verifyTotpLogin = async (
         if (!secret) {
 
             return res.status(400).json({
-
                 message: "El usuario no tiene TOTP configurado."
-
             });
 
         }
 
         const valid = verifyTotp(
-
             secret.secretEncrypted,
-
             code
-
         );
 
         if (!valid) {
@@ -364,19 +349,14 @@ export const verifyTotpLogin = async (
             const accessToken = jwt.sign(
 
                 {
-
                     id: user.id,
-
                     rol: user.rol.nombre
-
                 },
 
                 process.env.JWT_SECRET!,
 
                 {
-
                     expiresIn: "8h"
-
                 }
 
             );
@@ -391,79 +371,30 @@ export const verifyTotpLogin = async (
 
         }
 
-        const emailCode = Math.floor(
+        const securityToken = jwt.sign(
 
-            100000 + Math.random() * 900000
-
-        ).toString();
-
-        await prisma.emailVerificationCode.updateMany({
-
-            where: {
-
-                userId: user.id,
-
-                used: false
-
+            {
+                id: user.id,
+                step: "REQUIRE_SECURITY"
             },
 
-            data: {
+            process.env.JWT_SECRET!,
 
-                used: true
-
+            {
+                expiresIn: "5m"
             }
-
-        });
-
-        await prisma.emailVerificationCode.create({
-
-            data: {
-
-                userId: user.id,
-
-                code: emailCode,
-
-                expiresAt: new Date(
-
-                    Date.now() + 5 * 60 * 1000
-
-                )
-
-            }
-
-        });
-
-        await sendLoginCode(
-
-            user.email,
-
-            emailCode
 
         );
 
-        const emailToken = jwt.sign(
-    {
-        id: user.id,
-        step: "REQUIRE_EMAIL"
-    },
-    process.env.JWT_SECRET!,
-    {
-        expiresIn: "5m"
-    }
-);
+        return res.json({
 
-console.log("========================================");
-console.log("MODO PRUEBA EMAIL");
-console.log("Usuario:", user.email);
-console.log("Código:", emailCode);
-console.log("========================================");
+            step: "REQUIRE_SECURITY",
 
-return res.json({
-    step: "REQUIRE_EMAIL",
-    mfaToken: emailToken,
-    emailCode,
-    message: "Modo prueba: correo deshabilitado."
-});
+            mfaToken: securityToken,
+
+            message: "Responda las preguntas de seguridad."
+
+        });
 
     } catch (error) {
 
