@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import authRoutes from './routes/auth.routes';
 import totpRoutes from './routes/totp.routes';
 import solicitudesRoutes from './routes/solicitudes.routes';
+import gerentesRoutes from './routes/gerentes.routes';
 var cors = require('cors');
 
 dotenv.config();
