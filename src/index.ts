@@ -8,11 +8,18 @@ import authRoutes from './routes/auth.routes';
 import totpRoutes from './routes/totp.routes';
 import solicitudesRoutes from './routes/solicitudes.routes';
 import gerentesRoutes from './routes/gerentes.routes';
+var cors = require('cors');
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.use(cors({
+  origin: 'http://localhost:3000',
+  methods: ['GET','POST'    ,'PUT','DELETE','OPTIONS'],
+  credentials: true
+}));
 
 app.use(express.json());
 
