@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Controller, Post, Req, Res } from "@nestjs/common";
 import jwt from "jsonwebtoken";
 import QRCode from "qrcode";
 import prisma from "../lib/prisma";
@@ -235,6 +236,13 @@ export const verifyTotpLogin = async (req: Request, res: Response) => {
             }
         );
 
+        res.cookie('vm_access_token', accessToken, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 8 * 60 * 60 * 1000
+        });
+
         return res.json({
             step: "COMPLETED",
             accessToken
@@ -249,3 +257,21 @@ export const verifyTotpLogin = async (req: Request, res: Response) => {
     }
 
 };
+
+@Controller('api/totp')
+export class TotpController {
+    @Post('setup')
+    setup(@Req() req: Request, @Res() res: Response) {
+        return setupTotp(req, res);
+    }
+
+    @Post('enable')
+    enable(@Req() req: Request, @Res() res: Response) {
+        return enableTotp(req, res);
+    }
+
+    @Post('verify')
+    verify(@Req() req: Request, @Res() res: Response) {
+        return verifyTotpLogin(req, res);
+    }
+}

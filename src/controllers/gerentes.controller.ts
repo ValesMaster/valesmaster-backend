@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Controller, Get, Post, Req, Res } from '@nestjs/common';
 import bcrypt from 'bcrypt';
 import prisma from '../lib/prisma';
 
@@ -219,3 +220,21 @@ export const crearEmpleado = async (req: Request, res: Response) => {
 }
 
 // #endregion
+
+@Controller('api/gerentes')
+export class GerentesController {
+    @Get('consultar/empleados')
+    obtenerEmpleados(@Req() req: Request, @Res() res: Response) {
+        return obtenerEmpleadosFiltrados(req, res);
+    }
+
+    @Get('obtener/empleado/:id')
+    obtenerEmpleado(@Req() req: Request, @Res() res: Response) {
+        return obtenerDetalleEmpleado(req, res);
+    }
+
+    @Post('crear/empleado')
+    crear(@Req() req: Request, @Res() res: Response) {
+        return crearEmpleado(req, res);
+    }
+}

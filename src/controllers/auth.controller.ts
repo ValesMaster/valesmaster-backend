@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Controller, Post, Req, Res } from '@nestjs/common';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma';
@@ -186,6 +187,13 @@ export const loginPhaseOne = async (req: Request, res: Response) => {
                 { expiresIn: '8h' }
             );
 
+            res.cookie('vm_access_token', accessToken, {
+                httpOnly: true,
+                sameSite: 'lax',
+                secure: process.env.NODE_ENV === 'production',
+                maxAge: 8 * 60 * 60 * 1000
+            });
+
             return res.status(200).json({
                 step: 'COMPLETED',
                 accessToken
@@ -208,5 +216,18 @@ export const loginPhaseOne = async (req: Request, res: Response) => {
         return res.status(500).json({
             message: 'Error interno del servidor',
         });
+    }
+}
+
+@Controller('api/auth')
+export class AuthController {
+    @Post('register')
+    register(@Req() req: Request, @Res() res: Response) {
+        return registerTest(req, res);
+    }
+
+    @Post('login')
+    login(@Req() req: Request, @Res() res: Response) {
+        return loginPhaseOne(req, res);
     }
 }

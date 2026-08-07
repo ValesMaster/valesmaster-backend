@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Controller, Get, Post, Req, Res } from "@nestjs/common";
 import bcrypt from "bcrypt"
 import prisma from "../lib/prisma";
 
@@ -648,3 +649,36 @@ export const getPresolicitudDetalle = async (req: Request, res: Response) => {
         });
     }
 };
+
+@Controller('api/solicitudes')
+export class SolicitudesController {
+    @Post('crear')
+    crear(@Req() req: Request, @Res() res: Response) {
+        return crearPresolicitud(req, res);
+    }
+
+    @Post('validar/:id')
+    validar(@Req() req: Request, @Res() res: Response) {
+        return validarPresolicitud(req, res);
+    }
+
+    @Post('aprobar/:id')
+    aprobar(@Req() req: Request, @Res() res: Response) {
+        return aprobarSolicitud(req, res);
+    }
+
+    @Get('obtener-solicitudes')
+    obtenerSolicitudes(@Req() req: Request, @Res() res: Response) {
+        return getSolicitudes(req, res);
+    }
+
+    @Get('obtener-presolicitudes')
+    obtenerPresolicitudes(@Req() req: Request, @Res() res: Response) {
+        return getPresolicitudes(req, res);
+    }
+
+    @Get('detalle-presolicitud/:id')
+    obtenerDetalle(@Req() req: Request, @Res() res: Response) {
+        return getPresolicitudDetalle(req, res);
+    }
+}
