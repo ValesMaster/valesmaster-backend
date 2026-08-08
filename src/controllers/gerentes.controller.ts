@@ -219,3 +219,46 @@ export const crearEmpleado = async (req: Request, res: Response) => {
 }
 
 // #endregion
+// #region Desactivar Empleado
+export const desactivarEmpleados = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const empleadoExistente = await prisma.usuario.findUnique({
+            where: { id: Number(id) }
+        });
+
+        if (!empleadoExistente) {
+            return res.status(500).json({
+                message: 'Empleado no encontrado',
+            });
+        }
+
+        const empleadoDesactivado = await prisma.usuario.update({
+            where: { id: Number(id) },
+            data: {
+                activo: false,
+                updatedAt: new Date(),
+                deletedAt: new Date()
+            },
+            include: {
+                persona: true,
+                rol: true,
+                empleados: {
+                    include: {
+                        sucursal: true
+                    }
+                }
+            }
+        });
+
+        return res.status(200).json({
+            message: 'Empleado desactivado correctamente',
+            data: empleadoDesactivado
+        })
+    } catch (error: any) {
+        return res.status(500).json({
+            message: 'Error al desactivar empleado',
+            error: error.message
+        });
+    }
+}
