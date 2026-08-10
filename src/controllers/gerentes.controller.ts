@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import prisma from '../lib/prisma';
+import prisma, { prismaRead } from '../lib/prisma';
 
 // #region Obtiene empleados
 export const obtenerEmpleadosFiltrados = async (req: Request, res: Response) => {
@@ -29,7 +29,7 @@ export const obtenerEmpleadosFiltrados = async (req: Request, res: Response) => 
         };
 
         const [usuarios, totalRegistros] = await Promise.all([
-            prisma.usuario.findMany({
+            prismaRead.usuario.findMany({
                 where: whereClause,
                 skip: skip,
                 take: pageSize,
@@ -46,7 +46,7 @@ export const obtenerEmpleadosFiltrados = async (req: Request, res: Response) => 
                     createdAt: 'desc'
                 }
             }),
-            prisma.usuario.count({ where: whereClause })
+            prismaRead.usuario.count({ where: whereClause })
         ]);
 
         return res.status(200).json({
@@ -75,7 +75,7 @@ export const obtenerEmpleadosFiltrados = async (req: Request, res: Response) => 
 export const obtenerDetalleEmpleado = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-        const empladoExistente = await prisma.usuario.findUnique({
+        const empladoExistente = await prismaRead.usuario.findUnique({
             where: { id: Number(id) },
             include: {
                 rol: true,

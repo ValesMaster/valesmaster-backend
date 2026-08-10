@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt"
-import prisma from "../lib/prisma";
+import prisma, { prismaRead } from "../lib/prisma";
 
 export const crearPresolicitud = async (req: Request, res: Response) => {
     const {
@@ -426,7 +426,7 @@ export const getPresolicitudes = async (req: Request, res: Response) => {
         }
 
         const [presolicitudes, total] = await Promise.all([
-            prisma.presolicitud.findMany({
+            prismaRead.presolicitud.findMany({
                 where: whereClause,
                 skip: skip,
                 take: limitNumber,
@@ -467,7 +467,7 @@ export const getPresolicitudes = async (req: Request, res: Response) => {
                 },
                 orderBy: { createdAt: 'desc' }
             }),
-            prisma.presolicitud.count({ where: whereClause })
+            prismaRead.presolicitud.count({ where: whereClause })
         ]);
 
         const presolicitudesFormateadas = presolicitudes.map(p => ({
@@ -523,7 +523,7 @@ export const getSolicitudes = async (req: Request, res: Response) => {
         }
 
         const [solicitudes, total] = await Promise.all([
-            prisma.solicitud.findMany({
+            prismaRead.solicitud.findMany({
                 where: whereClause,
                 skip: skip,
                 take: limitNumber,
@@ -553,7 +553,7 @@ export const getSolicitudes = async (req: Request, res: Response) => {
                 },
                 orderBy: { createdAt: 'desc' }
             }),
-            prisma.solicitud.count({ where: whereClause })
+            prismaRead.solicitud.count({ where: whereClause })
         ]);
 
         const solicitudesFormateadas = solicitudes.map(s => ({
@@ -592,7 +592,7 @@ export const getPresolicitudDetalle = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
-        const presolicitud = await prisma.presolicitud.findUnique({
+        const presolicitud = await prismaRead.presolicitud.findUnique({
             where: { id: Number(id) },
             include: {
                 persona: {
