@@ -66,11 +66,12 @@ model Usuario {
 
   rol               Rol                @relation(fields: [rolId], references: [id])
   persona           Persona            @relation(fields: [personaId], references: [id])
-  totpSecrets       TotpSecret[]
-  securityQuestions SecurityQuestion[]
-  loginAttempts     LoginAttempt[]
-  distribuidoras    Distribuidora[]
-  empleados         Empleado[]
+
+totpSecrets          TotpSecret[]
+securityQuestions    SecurityQuestion[]
+loginAttempts        LoginAttempt[]
+distribuidoras       Distribuidora[]
+empleados            Empleado[]
 
   @@map("usuarios")
 }

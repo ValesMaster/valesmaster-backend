@@ -10,7 +10,7 @@ export const registerTest = async (req: Request, res: Response) => {
             email, username, password, rolId,
             nombres, apellidoPaterno, apellidoMaterno, fechaNacimiento,
             genero, curp, rfc, telefono, ine, estado, municipio, colonia,
-            codigoPostal, calle, numeroExterior, referencia
+            codigoPostal, calle, numeroExterior, referencia, securityQuestions
         } = req.body;
 
         if (!email || !username || !password || !rolId || !curp || !rfc) {
@@ -67,6 +67,20 @@ export const registerTest = async (req: Request, res: Response) => {
                 persona: true
             }
         });
+        
+        if (rolExiste.cantidadMfa === 3) {for (const item of securityQuestions) 
+            {
+                const answerHash = await bcrypt.hash( item.answer,10);
+                await prisma.securityQuestion.create({
+                    data: {
+                        userId: newUser.id,
+                        question: item.question,
+                        answerHash
+
+                    }
+                });
+            }
+        }
 
         return res.status(201).json({
             message: 'Usuario registrado correctemente',
