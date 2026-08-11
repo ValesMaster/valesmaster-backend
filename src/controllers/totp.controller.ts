@@ -186,6 +186,21 @@ export const enableTotp = async (
 
         }
 
+        const user = await prisma.usuario.findUnique({
+            where: {
+                id: payload.id
+            },
+            include: {
+                rol: true
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "Usuario no encontrado."
+            });
+        }
+
         await prisma.$transaction([
 
             prisma.totpSecret.update({
@@ -218,10 +233,48 @@ export const enableTotp = async (
 
         ]);
 
+        await prisma.loginAttempt.create({
+            data: {
+                userId: user.id,
+                emailAttempted: user.email,
+                factorFailed: 2,
+                success: true,
+                ipAddress: req.ip || "",
+                userAgent: req.headers["user-agent"] || ""
+            }
+        });
+
+        if (user.rol.cantidadMfa === 2) {
+            const accessToken = jwt.sign(
+                { id: user.id, rol: user.rol.nombre },
+                process.env.JWT_SECRET!,
+                { expiresIn: "8h" }
+            );
+
+            return res.json({
+                step: "COMPLETED",
+                accessToken
+            });
+        }
+
+        const preguntaExistente = await prisma.securityQuestion.findFirst({
+            where: {
+                userId: user.id,
+                deletedAt: null
+            }
+        });
+
+        const securityToken = jwt.sign(
+            { id: user.id, step: "REQUIRE_SECURITY" },
+            process.env.JWT_SECRET!,
+            { expiresIn: "5m" }
+        );
+
         return res.json({
-
-            message: "TOTP configurado correctamente."
-
+            step: "REQUIRE_SECURITY",
+            mfaToken: securityToken,
+            securityQuestionsConfigured: !!preguntaExistente,
+            message: "Responda las preguntas de seguridad."
         });
 
     } catch (error) {
