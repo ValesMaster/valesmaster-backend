@@ -402,6 +402,13 @@ export const verifyTotpLogin = async (
 
         }
 
+        const preguntaExistente = await prisma.securityQuestion.findFirst({
+            where: {
+                userId: user.id,
+                deletedAt: null
+            }
+        });
+
         const securityToken = jwt.sign(
 
             {
@@ -422,6 +429,8 @@ export const verifyTotpLogin = async (
             step: "REQUIRE_SECURITY",
 
             mfaToken: securityToken,
+
+            securityQuestionsConfigured: !!preguntaExistente,
 
             message: "Responda las preguntas de seguridad."
 
