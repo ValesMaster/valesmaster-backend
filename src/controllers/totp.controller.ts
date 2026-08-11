@@ -32,7 +32,7 @@ export const setupTotp = async (
             process.env.JWT_SECRET!
         );
 
-        if (payload.step) {
+        if (payload.step && payload.step !== "REQUIRE_TOTP") {
             return res.status(401).json({
                 message: "Token inválido."
             });
@@ -131,7 +131,7 @@ export const enableTotp = async (
             process.env.JWT_SECRET!
         );
 
-        if (payload.step) {
+        if (payload.step && payload.step !== "REQUIRE_TOTP") {
             return res.status(401).json({
                 message: "Token inválido."
             });
