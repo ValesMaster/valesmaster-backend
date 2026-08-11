@@ -8,6 +8,7 @@ import {
     generateTotpSecret,
     verifyTotp
 } from "../services/totp.service";
+import { respondJwtError } from "../utils/jwtErrors";
 
 export const setupTotp = async (
     req: Request,
@@ -30,6 +31,12 @@ export const setupTotp = async (
             token,
             process.env.JWT_SECRET!
         );
+
+        if (payload.step) {
+            return res.status(401).json({
+                message: "Token inválido."
+            });
+        }
 
         const user = await prisma.usuario.findUnique({
             where: {
@@ -91,6 +98,9 @@ export const setupTotp = async (
 
         console.error(error);
 
+        const jwtResponse = respondJwtError(res, error);
+        if (jwtResponse) return jwtResponse;
+
         return res.status(500).json({
             message: "Error interno"
         });
@@ -121,7 +131,19 @@ export const enableTotp = async (
             process.env.JWT_SECRET!
         );
 
+        if (payload.step) {
+            return res.status(401).json({
+                message: "Token inválido."
+            });
+        }
+
         const { code } = req.body;
+
+        if (!code || typeof code !== "string") {
+            return res.status(400).json({
+                message: "El código es obligatorio."
+            });
+        }
 
         const secret = await prisma.totpSecret.findFirst({
 
@@ -206,6 +228,9 @@ export const enableTotp = async (
 
         console.error(error);
 
+        const jwtResponse = respondJwtError(res, error);
+        if (jwtResponse) return jwtResponse;
+
         return res.status(500).json({
 
             message: "Error interno"
@@ -227,6 +252,12 @@ export const verifyTotpLogin = async (
             mfaToken,
             code
         } = req.body;
+
+        if (!mfaToken || !code) {
+            return res.status(400).json({
+                message: "El token y el código son obligatorios."
+            });
+        }
 
         const payload: any = jwt.verify(
             mfaToken,
@@ -399,6 +430,9 @@ export const verifyTotpLogin = async (
     } catch (error) {
 
         console.error(error);
+
+        const jwtResponse = respondJwtError(res, error);
+        if (jwtResponse) return jwtResponse;
 
         return res.status(500).json({
 

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma";
+import { respondJwtError } from "../utils/jwtErrors";
 
 
 export const getSecurityQuestions = async (
@@ -12,6 +13,12 @@ export const getSecurityQuestions = async (
     try {
 
         const { mfaToken } = req.body;
+
+        if (!mfaToken) {
+            return res.status(400).json({
+                message: "El token es obligatorio."
+            });
+        }
 
         const payload: any = jwt.verify(
             mfaToken,
@@ -58,6 +65,9 @@ export const getSecurityQuestions = async (
 
         console.error(error);
 
+        const jwtResponse = respondJwtError(res, error);
+        if (jwtResponse) return jwtResponse;
+
         return res.status(500).json({
 
             message: "Error interno."
@@ -78,6 +88,14 @@ export const verifySecurityQuestions = async (
             mfaToken,
             answers
         } = req.body;
+
+        if (!mfaToken) {
+
+            return res.status(400).json({
+                message: "El token es obligatorio."
+            });
+
+        }
 
         if (!Array.isArray(answers)) {
 
@@ -244,6 +262,9 @@ export const verifySecurityQuestions = async (
     } catch (error) {
 
         console.error(error);
+
+        const jwtResponse = respondJwtError(res, error);
+        if (jwtResponse) return jwtResponse;
 
         return res.status(500).json({
 
