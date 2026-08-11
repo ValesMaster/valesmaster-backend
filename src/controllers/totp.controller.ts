@@ -32,7 +32,7 @@ export const setupTotp = async (
             process.env.JWT_SECRET!
         );
 
-        if (payload.step) {
+        if (payload.step && payload.step !== "REQUIRE_TOTP") {
             return res.status(401).json({
                 message: "Token inválido."
             });
@@ -131,7 +131,7 @@ export const enableTotp = async (
             process.env.JWT_SECRET!
         );
 
-        if (payload.step) {
+        if (payload.step && payload.step !== "REQUIRE_TOTP") {
             return res.status(401).json({
                 message: "Token inválido."
             });
@@ -402,6 +402,13 @@ export const verifyTotpLogin = async (
 
         }
 
+        const preguntaExistente = await prisma.securityQuestion.findFirst({
+            where: {
+                userId: user.id,
+                deletedAt: null
+            }
+        });
+
         const securityToken = jwt.sign(
 
             {
@@ -422,6 +429,8 @@ export const verifyTotpLogin = async (
             step: "REQUIRE_SECURITY",
 
             mfaToken: securityToken,
+
+            securityQuestionsConfigured: !!preguntaExistente,
 
             message: "Responda las preguntas de seguridad."
 

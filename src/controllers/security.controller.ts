@@ -77,6 +77,138 @@ export const getSecurityQuestions = async (
     }
 
 };
+
+export const setupSecurityQuestions = async (
+    req: Request,
+    res: Response
+) => {
+
+    try {
+
+        const { mfaToken, securityQuestions } = req.body;
+
+        if (!mfaToken) {
+            return res.status(400).json({
+                message: "El token es obligatorio."
+            });
+        }
+
+        if (!Array.isArray(securityQuestions) || securityQuestions.length === 0) {
+            return res.status(400).json({
+                message: "Debe proporcionar al menos una pregunta de seguridad."
+            });
+        }
+
+        const invalidItem = securityQuestions.some(
+            (item) => !item?.question || !item?.answer
+        );
+
+        if (invalidItem) {
+            return res.status(400).json({
+                message: "Cada pregunta debe incluir 'question' y 'answer'."
+            });
+        }
+
+        const payload: any = jwt.verify(
+            mfaToken,
+            process.env.JWT_SECRET!
+        );
+
+        if (payload.step !== "REQUIRE_SECURITY") {
+            return res.status(401).json({
+                message: "Token inválido."
+            });
+        }
+
+        const user = await prisma.usuario.findUnique({
+            where: {
+                id: payload.id
+            },
+            include: {
+                rol: true
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "Usuario no encontrado."
+            });
+        }
+
+        const existentes = await prisma.securityQuestion.findMany({
+            where: {
+                userId: user.id,
+                deletedAt: null
+            }
+        });
+
+        if (existentes.length > 0) {
+            return res.status(409).json({
+                message: "El usuario ya tiene preguntas de seguridad configuradas."
+            });
+        }
+
+        const hashedQuestions = await Promise.all(
+            securityQuestions.map(async (item: { question: string; answer: string }) => ({
+                question: item.question,
+                answerHash: await bcrypt.hash(item.answer, 10)
+            }))
+        );
+
+        await prisma.$transaction(
+            hashedQuestions.map((item) =>
+                prisma.securityQuestion.create({
+                    data: {
+                        userId: user.id,
+                        question: item.question,
+                        answerHash: item.answerHash
+                    }
+                })
+            )
+        );
+
+        await prisma.loginAttempt.create({
+            data: {
+                userId: user.id,
+                emailAttempted: user.email,
+                factorFailed: 3,
+                success: true,
+                ipAddress: req.ip || "",
+                userAgent: req.headers["user-agent"] || ""
+            }
+        });
+
+        const accessToken = jwt.sign(
+            {
+                id: user.id,
+                rol: user.rol.nombre
+            },
+            process.env.JWT_SECRET!,
+            {
+                expiresIn: "8h"
+            }
+        );
+
+        return res.status(201).json({
+            step: "COMPLETED",
+            accessToken
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        const jwtResponse = respondJwtError(res, error);
+        if (jwtResponse) return jwtResponse;
+
+        return res.status(500).json({
+            message: "Error interno."
+        });
+
+    }
+
+};
+
 export const verifySecurityQuestions = async (
     req: Request,
     res: Response

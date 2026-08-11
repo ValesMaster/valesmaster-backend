@@ -205,6 +205,14 @@ export const loginPhaseOne = async (req: Request, res: Response) => {
                 accessToken
             });
         } else {
+            const totpConfirmado = await prisma.totpSecret.findFirst({
+                where: {
+                    userId: user.id,
+                    confirmed: true,
+                    deletedAt: null
+                }
+            });
+
             const mfaToken = jwt.sign(
                 { id: user.id, step: 'REQUIRE_TOTP', mfaRequired: requerimientosMfa },
                 process.env.JWT_SECRET!,
@@ -214,6 +222,7 @@ export const loginPhaseOne = async (req: Request, res: Response) => {
             return res.status(200).json({
                 step: 'REQUIRE_TOTP',
                 mfaToken,
+                totpConfigured: !!totpConfirmado,
                 message: 'Por favor ingrese su codigo de autenticacion'
             });
         }
