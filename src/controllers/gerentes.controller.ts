@@ -220,7 +220,7 @@ export const crearEmpleado = async (req: Request, res: Response) => {
 
 // #endregion
 // #region Desactivar Empleado
-export const desactivarEmpleados = async (req: Request, res: Response) => {
+export const desactivarEmpleado = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
         const empleadoExistente = await prisma.usuario.findUnique({
