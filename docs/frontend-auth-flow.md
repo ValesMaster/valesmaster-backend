@@ -11,6 +11,7 @@ Endpoints involucrados:
 | 2. TOTP (login recurrente) | `POST /api/totp/verify` | [totp.controller.ts](../src/controllers/totp.controller.ts) → `verifyTotpLogin` |
 | 3. Preguntas de seguridad (primera vez) | `POST /api/security/setup` | [security.controller.ts](../src/controllers/security.controller.ts) → `setupSecurityQuestions` |
 | 3. Preguntas de seguridad (repetición) | `POST /api/security/questions`, `POST /api/security/verify` | [security.controller.ts](../src/controllers/security.controller.ts) |
+| Validar sesión | `GET /api/auth/validate` | [auth.controller.ts](../src/controllers/auth.controller.ts) → `validateToken` |
 
 ---
 
@@ -21,16 +22,17 @@ Cada respuesta exitosa de login trae un campo `step` que le dice al frontend qu�
 ```mermaid
 flowchart TD
     A[POST /api/auth/login] -->|step: COMPLETED| Z[accessToken final]
-    A -->|step: REQUIRE_TOTP| B{"¿Usuario ya tiene TOTP confirmado?"}
-    B -->|No| C[POST /api/totp/setup + /api/totp/enable]
-    C --> D[POST /api/totp/verify]
-    B -->|Sí| D
+    A -->|step: REQUIRE_TOTP| B{"totpConfigured?"}
+    B -->|false| C["POST /api/totp/setup + /api/totp/enable"]
+    B -->|true| D[POST /api/totp/verify]
+    C -->|step: COMPLETED| Z
     D -->|step: COMPLETED| Z
-    D -->|step: REQUIRE_SECURITY| G{"¿Usuario ya tiene preguntas configuradas?"}
-    G -->|No| H[POST /api/security/setup]
-    H --> Z
-    G -->|Sí| E[POST /api/security/questions]
+    C -->|step: REQUIRE_SECURITY| G{"securityQuestionsConfigured?"}
+    D -->|step: REQUIRE_SECURITY| G
+    G -->|false| H[POST /api/security/setup]
+    G -->|true| E[POST /api/security/questions]
     E --> F[POST /api/security/verify]
+    H -->|step: COMPLETED| Z
     F -->|step: COMPLETED| Z
 ```
 
@@ -57,7 +59,7 @@ El backend se lo dice explícitamente, **no hay que adivinarlo ni sondear otros 
 | :--- | :--- | :--- | :--- | :--- |
 | `mfaToken` (REQUIRE_TOTP) | `loginPhaseOne` | `{ id, step: "REQUIRE_TOTP", mfaRequired }` | 5 min | Verificar TOTP (`/api/totp/verify`) **o** configurar TOTP por primera vez (`/api/totp/setup`, `/api/totp/enable`) |
 | `mfaToken` (REQUIRE_SECURITY) | `verifyTotpLogin` | `{ id, step: "REQUIRE_SECURITY" }` | 5 min | Configurar preguntas por primera vez (`/api/security/setup`) **o** obtener/responder preguntas ya existentes (`/api/security/questions`, `/api/security/verify`) |
-| `accessToken` | `loginPhaseOne`, `verifyTotpLogin` o `verifySecurityQuestions` (el que cierre el último factor) | `{ id, rol }` | 8 h | Sesión completa. Se envía en `Authorization: Bearer <accessToken>` |
+| `accessToken` | `loginPhaseOne`, `enableTotp`, `verifyTotpLogin`, `setupSecurityQuestions` o `verifySecurityQuestions` (el que cierre el último factor) | `{ id, rol }` | 8 h | Sesión completa. Se envía en `Authorization: Bearer <accessToken>` |
 
 **Importante:** el nombre `mfaToken` se reutiliza para dos propósitos distintos (TOTP pendiente vs. preguntas de seguridad pendientes). Para saber cuál es cuál, el frontend debe guardarse el `step` que vino junto con el token en la misma respuesta — no intentes inferirlo del token en sí.
 
@@ -103,7 +105,11 @@ Content-Type: application/json
 
 { "code": "845120" }
 ```
-→ `200` confirma el TOTP. Después de esto, continuá al login normal de TOTP (4b) con el mismo `mfaToken` (todavía dentro de la ventana de 5 min) o hacé que el usuario vuelva a loguearse.
+Confirma el TOTP **y completa la sesión en el mismo request** (igual que `/api/security/setup` — el usuario no tiene que volver a escribir el código):
+- **`200` `step: "COMPLETED"`** → `accessToken` final, listo (rol con `cantidadMfa === 2`).
+- **`200` `step: "REQUIRE_SECURITY"`** → guardá el nuevo `mfaToken` y `securityQuestionsConfigured` para el paso 3 (rol con `cantidadMfa === 3`).
+- **`400`** código incorrecto, o falta el campo `code`.
+- **`404`** no existe un TOTP pendiente (no se llamó a `/setup` antes), o usuario no encontrado.
 
 ### 4b. Login recurrente (el usuario ya tiene TOTP confirmado)
 
@@ -201,6 +207,20 @@ Authorization: Bearer <accessToken>
 
 Expira a las 8 horas sin mecanismo de refresh — al recibir `401` en cualquier endpoint protegido con este token, mandá al usuario de vuelta al login completo.
 
+### Validar el `accessToken` (ej. al recargar la app)
+
+Como todavía no hay refresh token, usá este endpoint para chequear si la sesión guardada (localStorage/cookie) sigue viva antes de mostrar la app — por ejemplo al recargar la página o al abrir la app.
+
+```http
+GET /api/auth/validate
+Authorization: Bearer <accessToken>
+```
+
+- **`200`** `{ valid: true, id, rol }` → sesión viva, el `rol` viene fresco desde la base de datos (no del token, por si cambió).
+- **`401`** `{ valid: false, message }` → token ausente, inválido, expirado, o el usuario fue desactivado/eliminado después de emitirse el token. Mandá al usuario al login.
+
+Este endpoint solo acepta el `accessToken` completo (sin `step`) — un `mfaToken` intermedio (TOTP o preguntas de seguridad pendientes) siempre da `401` acá, aunque todavía esté dentro de su ventana de 5 min.
+
 ---
 
 ## 8. Pseudocódigo de referencia (frontend)
@@ -218,19 +238,40 @@ async function login(email: string, password: string) {
   }
 }
 
-// 4a — primera vez: mostrar QR (/setup) y luego confirmar código (/enable)
-async function submitTotp(mfaToken: string, code: string) {
-  const res = await api.post('/api/totp/verify', { mfaToken, code });
-  if (res.data.step === 'COMPLETED') return saveSession(res.data.accessToken);
+// `/api/totp/enable` (4a) y `/api/totp/verify` (4b) devuelven la misma forma de respuesta
+// (step COMPLETED o REQUIRE_SECURITY), así que comparten el manejo posterior al código.
+function handleTotpStepResponse(data: any) {
+  if (data.step === 'COMPLETED') return saveSession(data.accessToken);
 
-  if (res.data.step === 'REQUIRE_SECURITY') {
-    return res.data.securityQuestionsConfigured
-      ? goToSecurityVerifyScreen(res.data.mfaToken)  // 5b
-      : goToSecuritySetupScreen(res.data.mfaToken);  // 5a
+  if (data.step === 'REQUIRE_SECURITY') {
+    return data.securityQuestionsConfigured
+      ? goToSecurityVerifyScreen(data.mfaToken)  // 5b
+      : goToSecuritySetupScreen(data.mfaToken);  // 5a
   }
 }
 
-// 5a — primera vez: elegir pregunta(s) + respuesta(s)
+// 4a — primera vez: pedir el QR y luego confirmar el código (una sola vez, ya deja logueado)
+async function fetchTotpQr(mfaToken: string) {
+  const res = await api.post('/api/totp/setup', null, {
+    headers: { Authorization: `Bearer ${mfaToken}` }
+  });
+  return res.data; // { qr, secret, secretId }
+}
+
+async function submitTotpEnable(mfaToken: string, code: string) {
+  const res = await api.post('/api/totp/enable', { code }, {
+    headers: { Authorization: `Bearer ${mfaToken}` }
+  });
+  return handleTotpStepResponse(res.data);
+}
+
+// 4b — repetición
+async function submitTotpVerify(mfaToken: string, code: string) {
+  const res = await api.post('/api/totp/verify', { mfaToken, code });
+  return handleTotpStepResponse(res.data);
+}
+
+// 5a — primera vez: elegir pregunta(s) + respuesta(s), ya deja logueado
 async function submitSecuritySetup(mfaToken: string, securityQuestions: { question: string; answer: string }[]) {
   const res = await api.post('/api/security/setup', { mfaToken, securityQuestions });
   if (res.data.step === 'COMPLETED') return saveSession(res.data.accessToken);
@@ -249,7 +290,7 @@ En todos los casos, un `401` en la llamada indica código/respuesta incorrecta o
 
 ## 9. Limitaciones actuales a tener en cuenta al planear el frontend
 
-- Fuera de `/api/totp/setup` y `/api/totp/enable`, **ninguna otra ruta del backend valida el `accessToken`** todavía (rutas de `gerentes` y `solicitudes` son anónimas). No asumas que mandar el header alcanza para "proteger" esas pantallas del lado del cliente únicamente.
+- Fuera de `/api/totp/setup`, `/api/totp/enable` y `/api/auth/validate`, **ninguna otra ruta del backend valida el `accessToken`** todavía (rutas de `gerentes` y `solicitudes` son anónimas). `/api/auth/validate` sirve para que el *frontend* decida si mostrar la app o mandar al login, pero no protege esos endpoints del lado del servidor — cualquiera puede llamarlos directo sin pasar por acá.
 - `/api/security/setup` no requiere un segundo secreto compartido más allá del `mfaToken` — cualquiera con ese token (válido 5 min, emitido solo tras pasar password+TOTP) puede fijar la pregunta/respuesta. Es el mismo nivel de confianza que ya tenía el bootstrap de TOTP, pero tenlo presente si más adelante se agrega recuperación de cuenta.
 - No hay refresh token: a las 8h el usuario tiene que volver a loguearse desde cero.
 - `POST /api/auth/register` está abierto sin autenticación (pensado solo para pruebas) — no lo expongas en la UI de producción.

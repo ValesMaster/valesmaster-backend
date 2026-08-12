@@ -233,3 +233,65 @@ export const loginPhaseOne = async (req: Request, res: Response) => {
         });
     }
 }
+
+export const validateToken = async (req: Request, res: Response) => {
+    try {
+        const auth = req.headers.authorization;
+
+        if (!auth) {
+            return res.status(401).json({
+                valid: false,
+                message: 'Token requerido'
+            });
+        }
+
+        const token = auth.split(' ')[1];
+
+        const payload: any = jwt.verify(token, process.env.JWT_SECRET!);
+
+        if (payload.step) {
+            return res.status(401).json({
+                valid: false,
+                message: 'Token inválido'
+            });
+        }
+
+        const user = await prisma.usuario.findUnique({
+            where: { id: payload.id, deletedAt: null },
+            include: { rol: true }
+        });
+
+        if (!user) {
+            return res.status(401).json({
+                valid: false,
+                message: 'Token inválido'
+            });
+        }
+
+        return res.status(200).json({
+            valid: true,
+            id: user.id,
+            rol: user.rol.nombre
+        });
+
+    } catch (error) {
+        if (error instanceof jwt.TokenExpiredError) {
+            return res.status(401).json({
+                valid: false,
+                message: 'El token expiró'
+            });
+        }
+
+        if (error instanceof jwt.JsonWebTokenError) {
+            return res.status(401).json({
+                valid: false,
+                message: 'Token inválido'
+            });
+        }
+
+        console.error('Error al validar token', error);
+        return res.status(500).json({
+            message: 'Error interno del servidor'
+        });
+    }
+}
