@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 
+//#region Obtener Perfil
 export const obtenerPerfil = async (req: Request, res: Response) => {
     const { id } = req.body;
     try {
@@ -26,6 +27,8 @@ export const obtenerPerfil = async (req: Request, res: Response) => {
     }
 }
 
+//#endregion
+//#region Obtener Clientes
 export const obtenerClientes = async (req: Request, res: Response) => {
     const { id_distribuidora } = req.body;
     try {
@@ -49,5 +52,73 @@ export const obtenerClientes = async (req: Request, res: Response) => {
             message: 'Error al obtener clientes',
             error: error.status
         })
+    }
+}
+
+//#endregion
+//#region Crear Cliente
+
+export const crearCliente = async (req: Request, res: Response) => {
+    const {
+        nombre, apellido_paterno, apellido_materno, telefono, genero,
+        estado, municipio, codigo_postal, colonia, calle, numero_exterior, numero_interior, referencia,
+        distribuidora_id
+    } = req.body
+    try {
+        const distribuidoraExistente = await prisma.distribuidora.findUnique({
+            where: { id: distribuidora_id }
+        });
+
+        if (!distribuidoraExistente) {
+            return res.status(404).json({
+                message: 'Distribuidora no encontrada',
+            })
+        }
+
+        const creacionCliente = await prisma.$transaction(async (tx) => {
+            const nuevaDireccion = await tx.direccion.create({
+                data: {
+                    estado,
+                    municipio,
+                    codigoPostal: codigo_postal,
+                    colonia,
+                    calle,
+                    numeroExterior: numero_exterior,
+                    numeroInterior: numero_interior,
+                    referencia
+                }
+            });
+
+            const nuevaPersona = await tx.persona.create({
+                data: {
+                    nombre,
+                    apellidoPaterno: apellido_paterno,
+                    apellidoMaterno: apellido_materno,
+                    telefono,
+                    genero,
+                    direccionId: nuevaDireccion.id
+                }
+            });
+
+            const nuevoCliente = await prisma.cliente.create({
+                data: {
+                    distribuidoraId: distribuidoraExistente.id,
+                    personaId: nuevaPersona.id,
+                    estado: 'ACTIVO',
+
+                }
+            });
+
+            return { nuevoCliente, nombre: nuevaPersona.nombre }
+        });
+
+        return res.status(201).json({
+            message: 'Cliente creado con exito',
+            data: creacionCliente
+        });
+    } catch (error: any) {
+        res.status(500).json({
+            message: 'Error al crear cliente'
+        });
     }
 }
