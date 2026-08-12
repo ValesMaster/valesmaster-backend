@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcrypt"
 import prisma from "../lib/prisma";
 
+//#region Crear Presolicitud 
 export const crearPresolicitud = async (req: Request, res: Response) => {
     const {
         //PERSONA
@@ -165,7 +166,8 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
         });
     }
 }
-
+//#endregion
+//#region Validar Presolicitud
 export const validarPresolicitud = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { validador_id, estado } = req.body;
@@ -237,7 +239,7 @@ export const validarPresolicitud = async (req: Request, res: Response) => {
         });
     }
 }
-
+//#region Aprobar 
 export const aprobarSolicitud = async (req: Request, res: Response) => {
     const { id } = req.params;
     const {
@@ -390,7 +392,8 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
         });
     }
 }
-
+//#endregion
+//#region Obtener Presolicitudes
 export const getPresolicitudes = async (req: Request, res: Response) => {
     try {
         const { page = '1', limit = '10', estado, sucursal_id, search } = req.query;
@@ -503,6 +506,8 @@ export const getPresolicitudes = async (req: Request, res: Response) => {
         });
     }
 };
+//#endregion
+//#region Obtener Solis
 
 export const getSolicitudes = async (req: Request, res: Response) => {
     try {
@@ -587,6 +592,7 @@ export const getSolicitudes = async (req: Request, res: Response) => {
         });
     }
 };
+//#region Solicitud
 
 export const getPresolicitudDetalle = async (req: Request, res: Response) => {
     const { id } = req.params;
