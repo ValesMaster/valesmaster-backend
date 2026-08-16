@@ -7,7 +7,7 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
     const {
         //PERSONA
         nombre, apellido_paterno, apellido_materno, fecha_nacimiento, telefono,
-        genero, curp, rfc, ine, comprobante_domicilio,
+        genero,
 
         //DIRECCION
         estado, municipio, codigo_postal, colonia, calle, numero_exterior, numero_interior,
@@ -21,6 +21,13 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
         negocios,
         familiares
     } = req.body;
+
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] }
+
+    const ineFile = files?.['ine']?.[0]?.filename || null;
+    const rfcFile = files?.['rfc']?.[0]?.filename || null;
+    const curpFile = files?.['curp']?.[0]?.filename || null;
+    const comprobanteFile = files?.['comprobante_domicilio']?.[0]?.filename || null;
 
     try {
         const folioGenerado = `PRE-${Date.now().toString().slice(-6)}`;
@@ -47,10 +54,10 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
                     fechaNacimiento: new Date(fecha_nacimiento),
                     telefono,
                     genero,
-                    curp,
-                    rfc,
-                    ine,
-                    comprobanteDomicilio: comprobante_domicilio,
+                    curp: curpFile,
+                    rfc: rfcFile,
+                    ine: ineFile,
+                    comprobanteDomicilio: comprobanteFile,
                     direccionId: nuevaDireccion.id
                 }
             });
@@ -592,7 +599,7 @@ export const getSolicitudes = async (req: Request, res: Response) => {
         });
     }
 };
-//#region Solicitud
+//#region Detalle Prsocilicitud
 
 export const getPresolicitudDetalle = async (req: Request, res: Response) => {
     const { id } = req.params;

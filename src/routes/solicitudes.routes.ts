@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { uploadPresolicitudFiles } from "../middlewares/uploads.middleware";
 import {
     crearPresolicitud,
     validarPresolicitud,
@@ -15,6 +16,6 @@ router.post('/validar/:id', validarPresolicitud);
 router.post('/aprobar/:id', aprobarSolicitud);
 router.get('/obtener-solicitudes', getSolicitudes);
 router.get('/obtener-presolicitudes', getPresolicitudes);
-router.get('/detalle-presolicitud/:id', getPresolicitudDetalle);
+router.get('/detalle-presolicitud/:id', uploadPresolicitudFiles, getPresolicitudDetalle);
 
 export default router;
