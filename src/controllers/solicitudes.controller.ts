@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt"
 import prisma from "../lib/prisma";
+import path from "path";
+import fs from "fs";
 
 //#region Crear Presolicitud 
 export const crearPresolicitud = async (req: Request, res: Response) => {
@@ -661,3 +663,32 @@ export const getPresolicitudDetalle = async (req: Request, res: Response) => {
         });
     }
 };
+
+//#region Obtener Archivos
+export const getArchivoPresolicitud = (req: Request, res: Response) => {
+    const rawNombre = req.params.nombreArchivo;
+    const nombreArchivo = Array.isArray(rawNombre) ? rawNombre[0] : rawNombre
+
+    if (nombreArchivo) {
+        return res.status(400).json({
+            message: 'Nombre de archivo invalido'
+        })
+    }
+
+    const nfsPath = path.join(__dirname, '../../uploads', nombreArchivo);
+    const localPath = path.join(__dirname, '../../uploads-fallback', nombreArchivo);
+
+    let filePath = '';
+
+    if (fs.existsSync(nfsPath)) {
+        filePath = nfsPath;
+    } else if (fs.existsSync(localPath)) {
+        filePath = localPath
+    } else {
+        return res.status(404).json({
+            message: 'Archivo no encontrado en el storage ni en respaldo'
+        })
+    }
+
+    return res.sendFile(filePath);
+}
