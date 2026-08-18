@@ -298,3 +298,29 @@ export const validateToken = async (req: Request, res: Response) => {
         });
     }
 }
+
+export const obtenerRoles = async (req: Request, res: Response) => {
+    try {
+        const roles = await prisma.rol.findMany({
+            select: {
+                nombre: true,
+                id: true
+            }
+        });
+
+        if (!roles) {
+            return res.status(404).json({
+                message: 'No se encontraron los roles'
+            });
+        }
+
+        return res.status(200).json({
+            message: 'Roles obtenidos con exito',
+            data: roles
+        });
+    } catch {
+        return res.status(500).json({
+            message: 'No se pudo obtener los roles'
+        });
+    }
+}
