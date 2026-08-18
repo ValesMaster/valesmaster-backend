@@ -27,7 +27,6 @@ export const obtenerPerfil = async (req: Request, res: Response) => {
     }
 }
 
-//#endregion
 //#region Obtener Clientes
 export const obtenerClientes = async (req: Request, res: Response) => {
     const { id_distribuidora } = req.body;
@@ -55,7 +54,6 @@ export const obtenerClientes = async (req: Request, res: Response) => {
     }
 }
 
-//#endregion
 //#region Crear Cliente
 
 export const crearCliente = async (req: Request, res: Response) => {
@@ -122,3 +120,37 @@ export const crearCliente = async (req: Request, res: Response) => {
         });
     }
 }
+
+//#region Detalle Cliente
+export const obtenerDetalleCliente = async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        const clienteExistente = await prisma.cliente.findUnique({
+            where: { id: Number(id) },
+            include: {
+                persona: true
+            }
+        });
+
+        if (!clienteExistente) {
+            return res.status(404).json({
+                message: 'Cliente no encontrado'
+            });
+        }
+
+        return res.status(200).json({
+            message: 'Cliente obtenido con exito',
+            data: clienteExistente
+        });
+    } catch (error: any) {
+        return res.status(500).json({
+            message: 'Error consultando al cliente'
+        });
+    }
+}
+
+// ? TO DO
+// * export const crearPrevale = async (req: Request, res: Response) => {
+// *     const
+// * }
