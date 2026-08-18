@@ -263,10 +263,8 @@ export const desactivarEmpleado = async (req: Request, res: Response) => {
 
 //#region Modificar Empleado
 
-//#region Modificar Empleado
-
 export const modificarEmpleado = async (req: Request, res: Response) => {
-    const { id } = req.params; // ID del usuario
+    const { id } = req.params;
     const body = req.body;
 
     try {
@@ -287,7 +285,6 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
         }
 
         const empleadoActualizado = await prisma.$transaction(async (tx) => {
-            // 1. Actualizar Dirección si se envía algún campo relacionado
             const direccionData: any = {};
             if (body.estado !== undefined) direccionData.estado = body.estado;
             if (body.municipio !== undefined) direccionData.municipio = body.municipio;
@@ -305,7 +302,6 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
                 });
             }
 
-            // 2. Actualizar Persona (aquí viven nombre, apellidos, teléfono, etc.)
             const personaData: any = {};
             if (body.nombre !== undefined) personaData.nombre = body.nombre;
             if (body.apellido_paterno !== undefined) personaData.apellidoPaterno = body.apellido_paterno;
@@ -321,25 +317,6 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
                 });
             }
 
-            // 3. Actualizar Usuario (username, email, contraseña, rol)
-            const usuarioData: any = {};
-            if (body.username !== undefined) usuarioData.username = body.username;
-            if (body.email !== undefined) usuarioData.email = body.email;
-            if (body.rol_id !== undefined) usuarioData.rolId = Number(body.rol_id);
-
-            if (body.password !== undefined && body.password.trim() !== '') {
-                const saltRounds = 10;
-                usuarioData.password = await bcrypt.hash(body.password, saltRounds);
-            }
-
-            if (Object.keys(usuarioData).length > 0) {
-                await tx.usuario.update({
-                    where: { id: Number(id) },
-                    data: usuarioData
-                });
-            }
-
-            // 4. Actualizar Sucursal del Empleado si aplica
             if (body.sucursal_id !== undefined && usuarioExistente.empleados.length > 0) {
                 const empleadoId = usuarioExistente.empleados[0].id;
                 await tx.empleado.update({
@@ -348,7 +325,6 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
                 });
             }
 
-            // 5. Retornar el registro completo actualizado con sus relaciones
             return await tx.usuario.findUnique({
                 where: { id: Number(id) },
                 include: {

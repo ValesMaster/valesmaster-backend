@@ -31,6 +31,32 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
     const curpFile = files?.['curp']?.[0]?.filename || null;
     const comprobanteFile = files?.['comprobante_domicilio']?.[0]?.filename || null;
 
+    let parsedVehiculos = vehiculos;
+    let parsedNegocios = negocios;
+    let parsedFamiliares = familiares;
+
+    if (typeof vehiculos === 'string') {
+        try {
+            parsedVehiculos = JSON.parse(vehiculos);
+        } catch (e) {
+            parsedVehiculos = [];
+        }
+    }
+    if (typeof negocios === 'string') {
+        try {
+            parsedNegocios = JSON.parse(negocios);
+        } catch (e) {
+            parsedNegocios = [];
+        }
+    }
+    if (typeof familiares === 'string') {
+        try {
+            parsedFamiliares = JSON.parse(familiares);
+        } catch (e) {
+            parsedFamiliares = [];
+        }
+    }
+
     try {
         const folioGenerado = `PRE-${Date.now().toString().slice(-6)}`;
 
@@ -76,20 +102,20 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
                 }
             });
 
-            if (!familiares) {
+            if (!parsedFamiliares) {
                 return res.status(400).json({
                     message: "Es necesario registrar a los familiares directos del solicitante"
                 });
             }
 
-            if (!negocios) {
+            if (!parsedNegocios) {
                 return res.status(400).json({
                     message: "Es necesario registrar los negocios en los que el solicitante ha estado"
                 });
             }
 
-            if (vehiculos && Array.isArray(vehiculos) && vehiculos.length > 0) {
-                for (const v of vehiculos) {
+            if (parsedVehiculos && Array.isArray(parsedVehiculos) && parsedVehiculos.length > 0) {
+                for (const v of parsedVehiculos) {
                     const vehiculoCreado = await tx.vehiculo.create({
                         data: {
                             marca: v.marca,
@@ -110,8 +136,8 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
                 }
             }
 
-            if (Array.isArray(negocios) && negocios.length > 0) {
-                for (const n of negocios) {
+            if (Array.isArray(parsedNegocios) && parsedNegocios.length > 0) {
+                for (const n of parsedNegocios) {
                     const negocioCreado = await tx.negocio.create({
                         data: {
                             nombre: n.nombre,
@@ -135,8 +161,8 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
                 });
             }
 
-            if (Array.isArray(familiares) && familiares.length > 0) {
-                for (const f of familiares) {
+            if (Array.isArray(parsedFamiliares) && parsedFamiliares.length > 0) {
+                for (const f of parsedFamiliares) {
                     const familiarCreado = await tx.persona.create({
                         data: {
                             nombre: f.nombre,
@@ -669,7 +695,7 @@ export const getArchivoPresolicitud = (req: Request, res: Response) => {
     const rawNombre = req.params.nombreArchivo;
     const nombreArchivo = Array.isArray(rawNombre) ? rawNombre[0] : rawNombre
 
-    if (nombreArchivo) {
+    if (!nombreArchivo) {
         return res.status(400).json({
             message: 'Nombre de archivo invalido'
         })

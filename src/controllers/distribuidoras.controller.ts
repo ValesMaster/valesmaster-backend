@@ -149,8 +149,3 @@ export const obtenerDetalleCliente = async (req: Request, res: Response) => {
         });
     }
 }
-
-// ? TO DO
-// * export const crearPrevale = async (req: Request, res: Response) => {
-// *     const
-// * }
