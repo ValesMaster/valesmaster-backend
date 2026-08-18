@@ -89,56 +89,79 @@ export const createSucursal = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { nombre, direccionId } = req.body;
+    const {
+      nombre,
+      estado,
+      municipio,
+      codigo_postal,
+      colonia,
+      calle,
+      numero_exterior,
+      numero_interior,
+      referencia,
+    } = req.body;
 
-    if (!nombre || !direccionId) {
+    // Validar datos obligatorios
+    if (
+      !nombre ||
+      !estado ||
+      !municipio ||
+      !codigo_postal ||
+      !colonia ||
+      !calle ||
+      !numero_exterior
+    ) {
       res.status(400).json({
         success: false,
-        message: "El nombre y direccionId son obligatorios",
+        message:
+          "Los campos nombre, estado, municipio, codigo_postal, colonia, calle y numero_exterior son obligatorios",
       });
       return;
     }
 
-    const direccion = await prisma.direccion.findFirst({
-      where: {
-        id: Number(direccionId),
-        deletedAt: null,
-      },
-    });
-
-    if (!direccion) {
-      res.status(404).json({
-        success: false,
-        message: "La dirección no existe",
+    const resultado = await prisma.$transaction(async (tx) => {
+      // Crear dirección
+      const nuevaDireccion = await tx.direccion.create({
+        data: {
+          estado,
+          municipio,
+          codigoPostal: codigo_postal,
+          colonia,
+          calle,
+          numeroExterior: numero_exterior,
+          numeroInterior: numero_interior ?? null,
+          referencia: referencia ?? null,
+        },
       });
-      return;
-    }
 
-    const sucursal = await prisma.sucursal.create({
-      data: {
-        nombre,
-        direccionId: Number(direccionId),
-      },
-      include: {
-        direccion: true,
-      },
+      // Crear sucursal utilizando la dirección recién creada
+      const nuevaSucursal = await tx.sucursal.create({
+        data: {
+          nombre,
+          direccionId: nuevaDireccion.id,
+        },
+        include: {
+          direccion: true,
+        },
+      });
+
+      return nuevaSucursal;
     });
 
     res.status(201).json({
       success: true,
-      message: "Sucursal creada correctamente",
-      data: sucursal,
+      message: "Sucursal y dirección creadas correctamente",
+      data: resultado,
     });
   } catch (error) {
     console.error("Error al crear sucursal:", error);
 
     res.status(500).json({
       success: false,
-      message: "Error al crear la sucursal",
+      message: "Error al crear la sucursal y su dirección",
     });
   }
 };
-
 
 // Modificar sucursal
 export const updateSucursal = async (
