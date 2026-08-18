@@ -10,6 +10,7 @@ import securityRoutes from "./routes/security.routes";
 import solicitudesRoutes from './routes/solicitudes.routes';
 import gerentesRoutes from './routes/gerentes.routes';
 import distribuidorasRoutes from './routes/distribuidoras.routes';
+import sucursalesRoutes from './routes/sucursal.routes';
 var cors = require('cors');
 
 dotenv.config();
@@ -35,6 +36,7 @@ app.use("/api/security", securityRoutes);
 app.use('/api/solicitudes', solicitudesRoutes);
 app.use('/api/gerentes', gerentesRoutes);
 app.use('/api/distribuidoras', distribuidorasRoutes)
+app.use("/api/sucursales", sucursalesRoutes);
 
 const start = async () => {
     await connectMongo();
