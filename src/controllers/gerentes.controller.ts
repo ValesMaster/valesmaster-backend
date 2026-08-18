@@ -69,7 +69,6 @@ export const obtenerEmpleadosFiltrados = async (req: Request, res: Response) => 
     }
 };
 
-// #endregion
 // #region Detalle empleado
 
 export const obtenerDetalleEmpleado = async (req: Request, res: Response) => {
@@ -116,7 +115,6 @@ export const obtenerDetalleEmpleado = async (req: Request, res: Response) => {
     }
 }
 
-// #endregion
 // #region Crear empleado
 
 export const crearEmpleado = async (req: Request, res: Response) => {
@@ -218,8 +216,8 @@ export const crearEmpleado = async (req: Request, res: Response) => {
     }
 }
 
-// #endregion
 // #region Desactivar Empleado
+
 export const desactivarEmpleado = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
@@ -258,6 +256,151 @@ export const desactivarEmpleado = async (req: Request, res: Response) => {
     } catch (error: any) {
         return res.status(500).json({
             message: 'Error al desactivar empleado',
+            error: error.message
+        });
+    }
+}
+
+//#region Modificar Empleado
+
+//#region Modificar Empleado
+
+export const modificarEmpleado = async (req: Request, res: Response) => {
+    const { id } = req.params; // ID del usuario
+    const body = req.body;
+
+    try {
+        const usuarioExistente = await prisma.usuario.findUnique({
+            where: { id: Number(id) },
+            include: {
+                persona: {
+                    include: { direccion: true }
+                },
+                empleados: true
+            }
+        });
+
+        if (!usuarioExistente) {
+            return res.status(404).json({
+                message: 'Empleado no encontrado'
+            });
+        }
+
+        const empleadoActualizado = await prisma.$transaction(async (tx) => {
+            // 1. Actualizar Dirección si se envía algún campo relacionado
+            const direccionData: any = {};
+            if (body.estado !== undefined) direccionData.estado = body.estado;
+            if (body.municipio !== undefined) direccionData.municipio = body.municipio;
+            if (body.codigo_postal !== undefined) direccionData.codigoPostal = body.codigo_postal;
+            if (body.colonia !== undefined) direccionData.colonia = body.colonia;
+            if (body.calle !== undefined) direccionData.calle = body.calle;
+            if (body.numero_exterior !== undefined) direccionData.numeroExterior = body.numero_exterior;
+            if (body.numero_interior !== undefined) direccionData.numeroInterior = body.numero_interior;
+            if (body.referencia !== undefined) direccionData.referencia = body.referencia;
+
+            if (Object.keys(direccionData).length > 0 && usuarioExistente.persona?.direccionId) {
+                await tx.direccion.update({
+                    where: { id: usuarioExistente.persona.direccionId },
+                    data: direccionData
+                });
+            }
+
+            // 2. Actualizar Persona (aquí viven nombre, apellidos, teléfono, etc.)
+            const personaData: any = {};
+            if (body.nombre !== undefined) personaData.nombre = body.nombre;
+            if (body.apellido_paterno !== undefined) personaData.apellidoPaterno = body.apellido_paterno;
+            if (body.apellido_materno !== undefined) personaData.apellidoMaterno = body.apellido_materno;
+            if (body.fecha_nacimiento !== undefined) personaData.fechaNacimiento = body.fecha_nacimiento;
+            if (body.telefono !== undefined) personaData.telefono = body.telefono;
+            if (body.genero !== undefined) personaData.genero = body.genero;
+
+            if (Object.keys(personaData).length > 0 && usuarioExistente.personaId) {
+                await tx.persona.update({
+                    where: { id: usuarioExistente.personaId },
+                    data: personaData
+                });
+            }
+
+            // 3. Actualizar Usuario (username, email, contraseña, rol)
+            const usuarioData: any = {};
+            if (body.username !== undefined) usuarioData.username = body.username;
+            if (body.email !== undefined) usuarioData.email = body.email;
+            if (body.rol_id !== undefined) usuarioData.rolId = Number(body.rol_id);
+
+            if (body.password !== undefined && body.password.trim() !== '') {
+                const saltRounds = 10;
+                usuarioData.password = await bcrypt.hash(body.password, saltRounds);
+            }
+
+            if (Object.keys(usuarioData).length > 0) {
+                await tx.usuario.update({
+                    where: { id: Number(id) },
+                    data: usuarioData
+                });
+            }
+
+            // 4. Actualizar Sucursal del Empleado si aplica
+            if (body.sucursal_id !== undefined && usuarioExistente.empleados.length > 0) {
+                const empleadoId = usuarioExistente.empleados[0].id;
+                await tx.empleado.update({
+                    where: { id: empleadoId },
+                    data: { sucursalId: Number(body.sucursal_id) }
+                });
+            }
+
+            // 5. Retornar el registro completo actualizado con sus relaciones
+            return await tx.usuario.findUnique({
+                where: { id: Number(id) },
+                include: {
+                    rol: true,
+                    persona: {
+                        include: { direccion: true }
+                    },
+                    empleados: {
+                        include: { sucursal: true }
+                    }
+                }
+            });
+        });
+
+        return res.status(200).json({
+            message: "Empleado actualizado con éxito",
+            data: empleadoActualizado
+        });
+
+    } catch (error: any) {
+        console.error('Error al modificar empleado:', error);
+        return res.status(500).json({
+            message: 'Error al modificar al empleado',
+            error: error.message
+        });
+    }
+}
+
+//#region Obtener Selector Sucursales
+
+export const obtenerSucursalesSelector = async (req: Request, res: Response) => {
+    try {
+        const sucursales = await prisma.sucursal.findMany({
+            select: {
+                id: true,
+                nombre: true
+            }
+        });
+
+        if (!sucursales) {
+            return res.status(404).json({
+                message: 'No se encontraron sucursales'
+            });
+        }
+
+        return res.status(200).json({
+            message: 'Sucursales obtenidas con exito',
+            data: sucursales
+        });
+    } catch (error: any) {
+        return res.status(500).json({
+            message: 'Error al obtener sucursales',
             error: error.message
         });
     }
