@@ -9,7 +9,7 @@ async function main() {
         { nombre: 'gerente_sucursal', cantidadMfa: 3 },
         { nombre: 'gerente_general', cantidadMfa: 3 },
         { nombre: 'coordinador', cantidadMfa: 3 },
-        { nombre: 'distribuidora', cantidadMfa: 2 },
+        { nombre: 'distribuidora', cantidadMfa: 1 },
     ]
 
     for (const rol of roles) {
