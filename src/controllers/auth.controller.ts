@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma';
 
+//#region Register Test
 // ESTE METODO DE REGISTRO ES PARA CREAR USUARIOS PARA PROBAR LAS FASES DE LOGIN
 export const registerTest = async (req: Request, res: Response) => {
     try {
@@ -67,10 +68,10 @@ export const registerTest = async (req: Request, res: Response) => {
                 persona: true
             }
         });
-        
-        if (rolExiste.cantidadMfa === 3) {for (const item of securityQuestions) 
-            {
-                const answerHash = await bcrypt.hash( item.answer,10);
+
+        if (rolExiste.cantidadMfa === 3) {
+            for (const item of securityQuestions) {
+                const answerHash = await bcrypt.hash(item.answer, 10);
                 await prisma.securityQuestion.create({
                     data: {
                         userId: newUser.id,
@@ -113,6 +114,7 @@ export const registerTest = async (req: Request, res: Response) => {
     }
 }
 
+//#region Login 1MFA
 export const loginPhaseOne = async (req: Request, res: Response) => {
     const { email, password } = req.body;
     const ipAddress = req.ip || req.socket.remoteAddress || '0.0.0.0';
@@ -234,6 +236,7 @@ export const loginPhaseOne = async (req: Request, res: Response) => {
     }
 }
 
+//#region Validate Token
 export const validateToken = async (req: Request, res: Response) => {
     try {
         const auth = req.headers.authorization;
