@@ -10,6 +10,7 @@ import securityRoutes from "./routes/security.routes";
 import solicitudesRoutes from './routes/solicitudes.routes';
 import gerentesRoutes from './routes/gerentes.routes';
 import distribuidorasRoutes from './routes/distribuidoras.routes';
+import sucursalesRoutes from './routes/sucursal.routes';
 import auditRoutes from './routes/audits.routes';
 
 var cors = require('cors');
@@ -36,6 +37,8 @@ app.use('/api/totp', totpRoutes);
 app.use("/api/security", securityRoutes);
 app.use('/api/solicitudes', solicitudesRoutes);
 app.use('/api/gerentes', gerentesRoutes);
+app.use('/api/distribuidoras', distribuidorasRoutes)
+app.use("/api/sucursales", sucursalesRoutes);
 app.use('/api/distribuidoras', distribuidorasRoutes);
 app.use('/api/audits', auditRoutes);
 
