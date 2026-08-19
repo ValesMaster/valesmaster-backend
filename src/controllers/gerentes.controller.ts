@@ -358,6 +358,7 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
 export const obtenerSucursalesSelector = async (req: Request, res: Response) => {
     try {
         const sucursales = await prisma.sucursal.findMany({
+            where: { deletedAt: null },
             select: {
                 id: true,
                 nombre: true
