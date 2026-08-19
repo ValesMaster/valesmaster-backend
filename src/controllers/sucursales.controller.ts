@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 
+//#region Obtener Sucursales
 // Obtener todas las sucursales
 export const getSucursales = async (
   req: Request,
@@ -82,7 +83,7 @@ export const getSucursalById = async (
   }
 };
 
-
+//#region Crear Sucursal
 // Crear sucursal
 export const createSucursal = async (
   req: Request,
@@ -163,6 +164,7 @@ export const createSucursal = async (
   }
 };
 
+//#region Modificar Sucursal
 // Modificar sucursal
 export const updateSucursal = async (
   req: Request,
@@ -242,7 +244,7 @@ export const updateSucursal = async (
   }
 };
 
-
+//#region Soft Delete Sucursal
 // Soft delete
 export const deleteSucursal = async (
   req: Request,
