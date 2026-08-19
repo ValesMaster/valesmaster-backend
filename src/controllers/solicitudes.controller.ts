@@ -90,12 +90,45 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
                 }
             });
 
+            // Buscar validadores asignados a la misma sucursal
+            let validadores = await tx.empleado.findMany({
+                where: {
+                    sucursalId: Number(sucursal_id),
+                    usuario: {
+                        rol: {
+                            nombre: 'validador'
+                        }
+                    }
+                },
+                select: { id: true }
+            });
+
+            // Si no hay validadores en esa sucursal, buscar de manera global en el sistema
+            if (validadores.length === 0) {
+                validadores = await tx.empleado.findMany({
+                    where: {
+                        usuario: {
+                            rol: {
+                                nombre: 'validador'
+                            }
+                        }
+                    },
+                    select: { id: true }
+                });
+            }
+
+            let validadorIdAleatorio: number | null = null;
+            if (validadores.length > 0) {
+                const randomIndex = Math.floor(Math.random() * validadores.length);
+                validadorIdAleatorio = validadores[randomIndex].id;
+            }
+
             const presolicitud = await tx.presolicitud.create({
                 data: {
                     folio: folioGenerado,
                     personaId: nuevaPersona.id,
                     sucursalId: Number(sucursal_id),
-                    validadorId: null,
+                    validadorId: validadorIdAleatorio,
                     coordinadorId: coordinador_id ? Number(coordinador_id) : null,
                     estado: 'PENDIENTE',
                     correoSolicitante: correo_solicitante
