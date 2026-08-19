@@ -497,6 +497,7 @@ model CanjePuntos {
   distribuidoraId  Int     @map("distribuidora_id")
   cajeroId         Int     @map("cajero_id")
   cantidadCanjeada Decimal @map("cantidad_canjeada") @db.Decimal(12, 2)
+  cantidadEfectivo Decimal @map("cantidad_efectivo") @db.Decimal(12, 2)
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")

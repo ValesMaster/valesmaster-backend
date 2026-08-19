@@ -7,22 +7,23 @@ import {
   updateSucursal,
   deleteSucursal,
 } from "../controllers/sucursales.controller";
+import { requireRole, verifyToken } from "../middlewares/auth.middleware";
 
 const router = Router();
 
 // Obtener todas
-router.get("/", getSucursales);
+router.get("/obtener", verifyToken, requireRole('gerente_general', 'gerente_sucursal'), getSucursales);
 
 // Obtener por ID
-router.get("/:id", getSucursalById);
+router.get("obtener/detalle/:id", verifyToken, requireRole('gerente_general', 'gerente_sucursal'), getSucursalById);
 
 // Crear
-router.post("/", createSucursal);
+router.post("/crear", verifyToken, requireRole('gerente_general', 'gerente_sucursal'), createSucursal);
 
 // Modificar
-router.put("/:id", updateSucursal);
+router.put("modificar/:id", verifyToken, requireRole('gerente_general', 'gerente_sucursal'), updateSucursal);
 
 // Soft delete
-router.delete("/:id", deleteSucursal);
+router.delete("eliminar/:id", verifyToken, requireRole('gerente_general', 'gerente_sucursal'), deleteSucursal);
 
 export default router;
