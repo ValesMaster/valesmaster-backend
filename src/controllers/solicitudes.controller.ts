@@ -16,7 +16,7 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
         referencia,
 
         //PRESOLICITUD
-        sucursal_id, coordinador_id, correo_solicitante,
+        correo_solicitante,
 
         //ARRAYS
         vehiculos,
@@ -58,6 +58,16 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
     }
 
     try {
+        const empleadoCoordinador = await prisma.empleado.findFirst({
+            where: { usuarioId: req.user!.id }
+        });
+
+        if (!empleadoCoordinador) {
+            return res.status(404).json({
+                message: "No se encontro un empleado asociado al usuario en sesion"
+            });
+        }
+
         const folioGenerado = `PRE-${Date.now().toString().slice(-6)}`;
 
         const nuevaPresolicitud = await prisma.$transaction(async (tx) => {
@@ -93,7 +103,7 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
             // Buscar validadores asignados a la misma sucursal
             let validadores = await tx.empleado.findMany({
                 where: {
-                    sucursalId: Number(sucursal_id),
+                    sucursalId: empleadoCoordinador.sucursalId,
                     usuario: {
                         rol: {
                             nombre: 'validador'
@@ -127,9 +137,9 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
                 data: {
                     folio: folioGenerado,
                     personaId: nuevaPersona.id,
-                    sucursalId: Number(sucursal_id),
+                    sucursalId: empleadoCoordinador.sucursalId,
                     validadorId: validadorIdAleatorio,
-                    coordinadorId: coordinador_id ? Number(coordinador_id) : null,
+                    coordinadorId: empleadoCoordinador.id,
                     estado: 'PENDIENTE',
                     correoSolicitante: correo_solicitante
                 }
@@ -238,10 +248,20 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
 //#region Validar Presolicitud
 export const validarPresolicitud = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { validador_id, estado } = req.body;
+    const { estado } = req.body;
     const estados_permitidos = ['VALIDADA', 'RECHAZADA'];
 
     try {
+        const empleadoValidador = await prisma.empleado.findFirst({
+            where: { usuarioId: req.user!.id }
+        });
+
+        if (!empleadoValidador) {
+            return res.status(404).json({
+                message: "No se encontro un empleado asociado al usuario en sesion"
+            });
+        }
+
         const presolicitudExistente = await prisma.presolicitud.findUnique({
             where: { id: Number(id) }
         });
@@ -264,7 +284,7 @@ export const validarPresolicitud = async (req: Request, res: Response) => {
                 where: { id: Number(id) },
                 data: {
                     estado: estado,
-                    validadorId: Number(validador_id)
+                    validadorId: empleadoValidador.id
                 },
                 include: {
                     persona: true,
@@ -311,7 +331,7 @@ export const validarPresolicitud = async (req: Request, res: Response) => {
 export const aprobarSolicitud = async (req: Request, res: Response) => {
     const { id } = req.params;
     const {
-        estado, gerente_id,
+        estado,
         user_password, user_name
     } = req.body;
     const estadosPermitidos = ['APROBADA', 'RECHAZADA']
@@ -322,6 +342,16 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
                 message: 'Error al aprobar solicitud',
                 error: 'El estado solo puede ser APROBADA o RECHAZADA'
             })
+        }
+
+        const empleadoGerente = await prisma.empleado.findFirst({
+            where: { usuarioId: req.user!.id }
+        });
+
+        if (!empleadoGerente) {
+            return res.status(404).json({
+                message: "No se encontro un empleado asociado al usuario en sesion"
+            });
         }
 
         const solicitudExistente = await prisma.solicitud.findUnique({
@@ -356,7 +386,7 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
                     where: { id: Number(solicitudExistente.id) },
                     data: {
                         estado: estado,
-                        gerenteId: gerente_id
+                        gerenteId: empleadoGerente.id
                     }
                 });
 
@@ -443,7 +473,7 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
                 where: { id: Number(id) },
                 data: {
                     estado: estado,
-                    gerenteId: Number(gerente_id)
+                    gerenteId: empleadoGerente.id
                 }
             });
 

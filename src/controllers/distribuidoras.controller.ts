@@ -4,10 +4,9 @@ import { registerAudit } from "../services/audit.service";
 
 //#region Obtener Perfil
 export const obtenerPerfil = async (req: Request, res: Response) => {
-    const { id } = req.body;
     try {
-        const distribuidora = await prisma.distribuidora.findUnique({
-            where: { id: id },
+        const distribuidora = await prisma.distribuidora.findFirst({
+            where: { usuarioId: req.user!.id },
             include: {
                 usuario: {
                     include: { persona: true }
@@ -32,8 +31,24 @@ export const obtenerPerfil = async (req: Request, res: Response) => {
 export const obtenerClientes = async (req: Request, res: Response) => {
     const { id_distribuidora } = req.body;
     try {
+        let distribuidoraId = id_distribuidora ? Number(id_distribuidora) : undefined;
+
+        if (req.user!.rol === 'distribuidora') {
+            const distribuidoraPropia = await prisma.distribuidora.findFirst({
+                where: { usuarioId: req.user!.id }
+            });
+
+            if (!distribuidoraPropia) {
+                return res.status(404).json({
+                    message: 'No se encontro una distribuidora asociada al usuario en sesion'
+                });
+            }
+
+            distribuidoraId = distribuidoraPropia.id;
+        }
+
         const clientes = await prisma.cliente.findMany({
-            where: { distribuidoraId: id_distribuidora },
+            where: { distribuidoraId },
             include: { persona: true }
         });
 
@@ -60,12 +75,11 @@ export const obtenerClientes = async (req: Request, res: Response) => {
 export const crearCliente = async (req: Request, res: Response) => {
     const {
         nombre, apellido_paterno, apellido_materno, telefono, genero,
-        estado, municipio, codigo_postal, colonia, calle, numero_exterior, numero_interior, referencia,
-        distribuidora_id
+        estado, municipio, codigo_postal, colonia, calle, numero_exterior, numero_interior, referencia
     } = req.body
     try {
-        const distribuidoraExistente = await prisma.distribuidora.findUnique({
-            where: { id: distribuidora_id }
+        const distribuidoraExistente = await prisma.distribuidora.findFirst({
+            where: { usuarioId: req.user!.id }
         });
 
         if (!distribuidoraExistente) {

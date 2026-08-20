@@ -28,9 +28,9 @@ model Persona {
   fechaNacimiento    DateTime? @map("fecha_nacimiento") @db.Date
   telefono           String?   @db.VarChar(20)
   genero             String?   @db.VarChar(20)
-  curp               String?   @unique @db.VarChar(18)
-  rfc                String?   @unique @db.VarChar(13)
-  ine                String?   @db.VarChar(50)
+  curp               String?   @unique @db.VarChar(255)
+  rfc                String?   @unique @db.VarChar(255)
+  ine                String?   @db.VarChar(255)
   direccionId        Int?      @map("direccion_id")
   comprobanteDomicilio String? @map("comprobante_domicilio") @db.VarChar(255)
 
