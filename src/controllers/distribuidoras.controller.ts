@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
+import { registerAudit } from "../services/audit.service";
 
 //#region Obtener Perfil
 export const obtenerPerfil = async (req: Request, res: Response) => {
@@ -110,11 +111,36 @@ export const crearCliente = async (req: Request, res: Response) => {
             return { nuevoCliente, nombre: nuevaPersona.nombre }
         });
 
+                registerAudit({
+            action: 'CREAR_CLIENTE',
+            module: 'CLIENTES',
+            status: 'SUCCESS',
+            req,
+            details: {
+                clienteId: creacionCliente.nuevoCliente.id,
+                distribuidoraId: distribuidoraExistente.id,
+                nombre: creacionCliente.nombre
+            }
+        });
+
         return res.status(201).json({
             message: 'Cliente creado con exito',
             data: creacionCliente
         });
     } catch (error: any) {
+
+                registerAudit({
+            action: 'CREAR_CLIENTE',
+            module: 'CLIENTES',
+            status: 'FAILED',
+            req,
+            details: {
+                distribuidoraId: req.body?.distribuidora_id,
+                nombre: req.body?.nombre,
+                error: error.message
+            }
+        });
+        
         res.status(500).json({
             message: 'Error al crear cliente'
         });

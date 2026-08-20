@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
+import { registerAudit } from "../services/audit.service";
 
 //#region Obtener Sucursales
 // Obtener todas las sucursales
@@ -149,13 +150,37 @@ export const createSucursal = async (
       return nuevaSucursal;
     });
 
+        // Registrar auditoría de éxito
+    registerAudit({
+      action: "CREAR_SUCURSAL",
+      module: "SUCURSALES",
+      status: "SUCCESS",
+      req,
+      details: {
+        sucursalId: resultado.id,
+        nombre: resultado.nombre,
+        direccionId: resultado.direccionId,
+      },
+    });
+
     res.status(201).json({
       success: true,
       message: "Sucursal y dirección creadas correctamente",
       data: resultado,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error al crear sucursal:", error);
+
+    registerAudit({
+        action: "CREAR_SUCURSAL",
+        module: "SUCURSALES",
+        status: "FAILED",
+        req,
+        details: {
+            nombre: req.body?.nombre,
+            error: error.message,
+        },
+    });
 
     res.status(500).json({
       success: false,
@@ -170,10 +195,9 @@ export const updateSucursal = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  try {
-    const id = Number(req.params.id);
-    const { nombre, direccionId } = req.body;
+  const id = Number(req.params.id);
 
+  try {
     if (isNaN(id)) {
       res.status(400).json({
         success: false,
@@ -182,60 +206,127 @@ export const updateSucursal = async (
       return;
     }
 
-    const sucursal = await prisma.sucursal.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-      },
-    });
+    const {
+      nombre,
+      estado,
+      municipio,
+      codigo_postal,
+      colonia,
+      calle,
+      numero_exterior,
+      numero_interior,
+      referencia,
+    } = req.body;
 
-    if (!sucursal) {
-      res.status(404).json({
-        success: false,
-        message: "Sucursal no encontrada",
-      });
-      return;
-    }
-
-    if (direccionId !== undefined) {
-      const direccion = await prisma.direccion.findFirst({
+    const resultado = await prisma.$transaction(async (tx) => {
+      const sucursal = await tx.sucursal.findFirst({
         where: {
-          id: Number(direccionId),
+          id,
           deletedAt: null,
+        },
+        include: {
+          direccion: true,
         },
       });
 
-      if (!direccion) {
-        res.status(404).json({
-          success: false,
-          message: "La dirección no existe",
-        });
-        return;
+      if (!sucursal) {
+        throw new Error("Sucursal no encontrada");
       }
-    }
 
-    const sucursalActualizada = await prisma.sucursal.update({
-      where: {
-        id,
-      },
-      data: {
-        ...(nombre !== undefined && { nombre }),
-        ...(direccionId !== undefined && {
-          direccionId: Number(direccionId),
-        }),
-      },
-      include: {
-        direccion: true,
+      const sucursalActualizada = await tx.sucursal.update({
+        where: {
+          id,
+        },
+        data: {
+          ...(nombre !== undefined && {
+            nombre,
+          }),
+        },
+        include: {
+          direccion: true,
+        },
+      });
+
+      const direccionActualizada = await tx.direccion.update({
+        where: {
+          id: sucursal.direccionId,
+        },
+        data: {
+          ...(estado !== undefined && {
+            estado,
+          }),
+          ...(municipio !== undefined && {
+            municipio,
+          }),
+          ...(codigo_postal !== undefined && {
+            codigoPostal: codigo_postal,
+          }),
+          ...(colonia !== undefined && {
+            colonia,
+          }),
+          ...(calle !== undefined && {
+            calle,
+          }),
+          ...(numero_exterior !== undefined && {
+            numeroExterior: numero_exterior,
+          }),
+          ...(numero_interior !== undefined && {
+            numeroInterior: numero_interior,
+          }),
+          ...(referencia !== undefined && {
+            referencia,
+          }),
+        },
+      });
+
+      return {
+        sucursal: sucursalActualizada,
+        direccion: direccionActualizada,
+      };
+    });
+
+    // Registrar auditoría de éxito
+    registerAudit({
+      action: "MODIFICAR_SUCURSAL",
+      module: "SUCURSALES",
+      status: "SUCCESS",
+      req,
+      details: {
+        sucursalId: id,
+        nombre: resultado.sucursal.nombre,
+        direccionId: resultado.sucursal.direccionId,
+        cambios: req.body,
       },
     });
 
     res.status(200).json({
       success: true,
       message: "Sucursal actualizada correctamente",
-      data: sucursalActualizada,
+      data: resultado,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error al actualizar sucursal:", error);
+
+    // Registrar auditoría de fallo
+    registerAudit({
+      action: "MODIFICAR_SUCURSAL",
+      module: "SUCURSALES",
+      status: "FAILED",
+      req,
+      details: {
+        sucursalId: id,
+        cambios: req.body,
+        error: error.message,
+      },
+    });
+
+    if (error.message === "Sucursal no encontrada") {
+      res.status(404).json({
+        success: false,
+        message: "Sucursal no encontrada",
+      });
+      return;
+    }
 
     res.status(500).json({
       success: false,
@@ -250,9 +341,9 @@ export const deleteSucursal = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  try {
-    const id = Number(req.params.id);
+  const id = Number(req.params.id);
 
+  try {
     if (isNaN(id)) {
       res.status(400).json({
         success: false,
@@ -265,6 +356,9 @@ export const deleteSucursal = async (
       where: {
         id,
         deletedAt: null,
+      },
+      include: {
+        direccion: true,
       },
     });
 
@@ -283,6 +377,23 @@ export const deleteSucursal = async (
       data: {
         deletedAt: new Date(),
       },
+      include: {
+        direccion: true,
+      },
+    });
+
+    // Registrar auditoría de éxito
+    registerAudit({
+      action: "ELIMINAR_SUCURSAL",
+      module: "SUCURSALES",
+      status: "SUCCESS",
+      req,
+      details: {
+        sucursalId: sucursalEliminada.id,
+        nombre: sucursalEliminada.nombre,
+        direccionId: sucursalEliminada.direccionId,
+        deletedAt: sucursalEliminada.deletedAt,
+      },
     });
 
     res.status(200).json({
@@ -290,8 +401,20 @@ export const deleteSucursal = async (
       message: "Sucursal eliminada correctamente",
       data: sucursalEliminada,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error al eliminar sucursal:", error);
+
+    // Registrar auditoría de fallo
+    registerAudit({
+      action: "ELIMINAR_SUCURSAL",
+      module: "SUCURSALES",
+      status: "FAILED",
+      req,
+      details: {
+        sucursalId: id,
+        error: error.message,
+      },
+    });
 
     res.status(500).json({
       success: false,
