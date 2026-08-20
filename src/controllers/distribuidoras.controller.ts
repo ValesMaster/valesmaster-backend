@@ -149,3 +149,116 @@ export const obtenerDetalleCliente = async (req: Request, res: Response) => {
         });
     }
 }
+
+//#region Modificar Cliente
+export const modificarCliente = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const body = req.body;
+
+    try {
+        const clienteExistente = await prisma.cliente.findUnique({
+            where: { id: Number(id) },
+            include: {
+                persona: {
+                    include: {
+                        direccion: true
+                    }
+                }
+            }
+        });
+
+        if (!clienteExistente) {
+            return res.status(404).json({
+                message: 'Cliente no encontrado'
+            });
+        }
+
+        const clienteActualizado = await prisma.$transaction(async (tx) => {
+            const direccionData: any = {};
+            if (body.estado !== undefined) direccionData.estado = body.estado;
+            if (body.municipio !== undefined) direccionData.municipio = body.municipio;
+            if (body.codigo_postal !== undefined) direccionData.codigoPostal = body.codigo_postal;
+            if (body.colonia !== undefined) direccionData.colonia = body.colonia;
+            if (body.calle !== undefined) direccionData.calle = body.calle;
+            if (body.numero_exterior !== undefined) direccionData.numeroExterior = body.numero_exterior;
+            if (body.numero_interior !== undefined) direccionData.numeroInterior = body.numero_interior;
+            if (body.referencia !== undefined) direccionData.referencia = body.referencia;
+
+            if (Object.keys(direccionData).length > 0 && clienteExistente.persona?.direccionId) {
+                await tx.direccion.update({
+                    where: { id: clienteExistente.persona.direccionId },
+                    data: direccionData
+                });
+            }
+
+            const personaData: any = {};
+            if (body.nombre !== undefined) personaData.nombre = body.nombre;
+            if (body.apellido_paterno !== undefined) personaData.apellidoPaterno = body.apellido_paterno;
+            if (body.apellido_materno !== undefined) personaData.apellidoMaterno = body.apellido_materno;
+            if (body.fecha_nacimiento !== undefined) personaData.fechaNacimiento = body.fecha_nacimiento;
+            if (body.telefono !== undefined) personaData.telefono = body.telefono;
+            if (body.genero !== undefined) personaData.genero = body.genero;
+
+            if (Object.keys(personaData).length > 0 && clienteExistente.personaId) {
+                await tx.persona.update({
+                    where: { id: clienteExistente.personaId },
+                    data: personaData
+                });
+            }
+
+            return await tx.cliente.findUnique({
+                where: { id: Number(id) },
+                include: {
+                    persona: {
+                        include: { direccion: true }
+                    }
+                }
+            });
+        });
+
+        return res.status(200).json({
+            message: 'Cliente actualizado con exito',
+            data: clienteActualizado
+        });
+    } catch (error: any) {
+        return res.status(500).json({
+            message: 'Error al modificar cliente',
+            error: error.message
+        });
+    }
+}
+
+//#region Soft Delete Cliente
+export const eliminarCliente = async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        const clienteExistente = await prisma.cliente.findUnique({
+            where: { id: Number(id) },
+        });
+
+        if (!clienteExistente) {
+            return res.status(404).json({
+                message: 'Cliente no encontrado'
+            });
+        }
+
+        const clienteDesactivado = await prisma.cliente.update({
+            where: { id: Number(clienteExistente.id) },
+            data: {
+                estado: 'INACTIVO',
+                updatedAt: new Date(),
+                deletedAt: new Date()
+            }
+        });
+
+        return res.status(200).json({
+            message: 'Cliente desactivado correctamente',
+            data: clienteDesactivado
+        });
+    } catch (error: any) {
+        return res.status(500).json({
+            message: 'Error al desactivar al cliente'
+        })
+    }
+}
