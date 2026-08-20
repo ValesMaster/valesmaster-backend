@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import prisma from '../lib/prisma';
+import { registerAudit } from '../services/audit.service';
+
 
 // #region Obtiene empleados
 export const obtenerEmpleadosFiltrados = async (req: Request, res: Response) => {
@@ -195,12 +197,42 @@ export const crearEmpleado = async (req: Request, res: Response) => {
             return { empleadoCreado, rolNombre: rolEncontrado.nombre, cantidadMfa: rolEncontrado.cantidadMfa }
         });
 
+        registerAudit({
+            action: 'CREAR_EMPLEADO',
+            module: 'EMPLEADOS',
+            status: 'SUCCESS',
+            req,
+            details: {
+                empleadoId: creacionEmpleado.empleadoCreado.id,
+                usuarioId: creacionEmpleado.empleadoCreado.usuarioId,
+                username,
+                email,
+                sucursalId: sucursal_id,
+                rolId: rol_id,
+                rolNombre: creacionEmpleado.rolNombre
+            }
+        });
+
         return res.status(200).json({
             message: 'Empleado creado exitosamente',
             data: creacionEmpleado
         })
     } catch (error: any) {
         console.error('Error al crear empleado:', error);
+
+        registerAudit({
+            action: 'CREAR_EMPLEADO',
+            module: 'EMPLEADOS',
+            status: 'FAILED',
+            req,
+            details: {
+                username: req.body?.username,
+                email: req.body?.email,
+                sucursalId: req.body?.sucursal_id,
+                rolId: req.body?.rol_id,
+                error: error.message
+            }
+        });
 
         if (error.code === 'P2002') {
             return res.status(400).json({
@@ -249,11 +281,36 @@ export const desactivarEmpleado = async (req: Request, res: Response) => {
             }
         });
 
+        registerAudit({
+            action: 'DESACTIVAR_EMPLEADO',
+            module: 'EMPLEADOS',
+            status: 'SUCCESS',
+            req,
+            details: {
+                usuarioId: Number(id),
+                username: empleadoExistente.username,
+                email: empleadoExistente.email
+            }
+        });
+
+
         return res.status(200).json({
             message: 'Empleado desactivado correctamente',
             data: empleadoDesactivado
         })
     } catch (error: any) {
+
+        registerAudit({
+            action: 'DESACTIVAR_EMPLEADO',
+            module: 'EMPLEADOS',
+            status: 'FAILED',
+            req,
+            details: {
+                usuarioId: Number(id),
+                error: error.message
+            }
+        });
+
         return res.status(500).json({
             message: 'Error al desactivar empleado',
             error: error.message
@@ -339,6 +396,18 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
             });
         });
 
+        registerAudit({
+            action: 'MODIFICAR_EMPLEADO',
+            module: 'EMPLEADOS',
+            status: 'SUCCESS',
+            req,
+            details: {
+                usuarioId: Number(id),
+                username: usuarioExistente.username,
+                cambios: body
+            }
+        });
+
         return res.status(200).json({
             message: "Empleado actualizado con éxito",
             data: empleadoActualizado
@@ -346,6 +415,18 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
 
     } catch (error: any) {
         console.error('Error al modificar empleado:', error);
+
+        registerAudit({
+            action: 'MODIFICAR_EMPLEADO',
+            module: 'EMPLEADOS',
+            status: 'FAILED',
+            req,
+            details: {
+                usuarioId: Number(id),
+                cambios: body,
+                error: error.message
+            }
+        });
         return res.status(500).json({
             message: 'Error al modificar al empleado',
             error: error.message
