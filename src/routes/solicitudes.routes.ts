@@ -14,6 +14,7 @@ import { requireVpn } from "../middlewares/vpn.middleware";
 
 const router = Router();
 
+//requireVpn
 router.post('/crear', requireVpn, verifyToken, requireRole('coordinador'), uploadPresolicitudFiles, crearPresolicitud);
 router.post('/validar/:id', requireVpn, verifyToken, requireRole('validador'), validarPresolicitud);
 router.post('/aprobar/:id', requireVpn, verifyToken, requireRole('gerente_general', 'gerente_sucursal'), aprobarSolicitud);

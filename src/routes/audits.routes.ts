@@ -5,6 +5,7 @@ import { requireVpn } from "../middlewares/vpn.middleware";
 
 const router = Router();
 
-router.get('/logs', requireVpn, verifyToken, requireRole('administrador'), getAuditLogs);
+//requireVpn
+router.get('/logs', verifyToken, requireRole('administrador'), getAuditLogs);
 
 export default router;

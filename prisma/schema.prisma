@@ -180,6 +180,7 @@ model Empleado {
   coordinadorPresol  Presolicitud[] @relation("CoordinadorPresol")
   gerenteSol         Solicitud[]    @relation("GerenteSol")
   canjesPuntos       CanjePuntos[]
+  coordinadorPrevale Prevale[]      @relation("CoordinadorPrevale")
 
   @@map("empleados")
 }
@@ -409,6 +410,7 @@ model Prevale {
   id                 Int       @id @default(autoincrement())
   clienteId          Int       @map("cliente_id")
   distribuidoraId    Int       @map("distribuidora_id")
+  coordinadorId      Int?      @map("coordinador_id")
   cantidadSolicitada Decimal   @map("cantidad_solicitada") @db.Decimal(12, 2)
   plazos             Int
   tipoVale           String    @map("tipo_vale") @db.VarChar(50)
@@ -421,6 +423,7 @@ model Prevale {
 
   cliente          Cliente               @relation(fields: [clienteId], references: [id])
   distribuidora    Distribuidora         @relation(fields: [distribuidoraId], references: [id])
+  coordinador      Empleado?             @relation("CoordinadorPrevale", fields: [coordinadorId], references: [id])
   vales            Vale[]
   detallesPagos    PrevaleDetallePago[]
 

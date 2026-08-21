@@ -14,6 +14,8 @@ import gerentesRoutes from './routes/gerentes.routes';
 import distribuidorasRoutes from './routes/distribuidoras.routes';
 import sucursalesRoutes from './routes/sucursal.routes';
 import auditRoutes from './routes/audits.routes';
+import cajerasRoutes from './routes/cajeras.routes';
+import valesRoutes from './routes/vales.routes';
 
 var cors = require('cors');
 
@@ -53,8 +55,9 @@ app.use('/api/solicitudes', solicitudesRoutes);
 app.use('/api/gerentes', gerentesRoutes);
 app.use('/api/distribuidoras', distribuidorasRoutes)
 app.use("/api/sucursales", sucursalesRoutes);
-app.use('/api/distribuidoras', distribuidorasRoutes);
 app.use('/api/audits', auditRoutes);
+app.use('/api/cajeras', cajerasRoutes);
+app.use('/api/vales', valesRoutes);
 
 io.on('connection', (socket) => {
     console.log(`Usuario conectado por WebSocket: ${socket.id}`);
