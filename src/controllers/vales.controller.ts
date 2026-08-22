@@ -357,7 +357,31 @@ export const obtenerVales = async (req: Request, res: Response) => {
             whereClause.estado = String(estado).toUpperCase();
         }
 
-        if (distribuidora_id) {
+        if (req.user!.rol === 'distribuidora') {
+            const distribuidoraPropia = await prisma.distribuidora.findFirst({
+                where: { usuarioId: req.user!.id }
+            });
+
+            if (!distribuidoraPropia) {
+                return res.status(404).json({
+                    message: "No se encontro una distribuidora asociada al usuario en sesion"
+                });
+            }
+
+            whereClause.distribuidoraId = distribuidoraPropia.id;
+        } else if (req.user!.rol === 'cajero') {
+            const empleadoCajero = await prisma.empleado.findFirst({
+                where: { usuarioId: req.user!.id }
+            });
+
+            if (!empleadoCajero) {
+                return res.status(404).json({
+                    message: "No se encontro un empleado asociado al usuario en sesion"
+                });
+            }
+
+            whereClause.distribuidora = { sucursalId: empleadoCajero.sucursalId };
+        } else if (distribuidora_id) {
             whereClause.distribuidoraId = Number(distribuidora_id);
         }
 
@@ -426,6 +450,108 @@ export const obtenerVales = async (req: Request, res: Response) => {
 }
 //#endregion
 
+//#region Obtener Prevales
+export const obtenerPrevales = async (req: Request, res: Response) => {
+    try {
+        const { page = '1', limit = '10', estado, distribuidora_id, search } = req.query;
+
+        const pageNumber = parseInt(page as string, 10);
+        const limitNumber = parseInt(limit as string, 10);
+        const skip = (pageNumber - 1) * limitNumber;
+
+        const whereClause: any = {};
+
+        if (estado) {
+            whereClause.estado = String(estado).toUpperCase();
+        }
+
+        if (req.user!.rol === 'distribuidora') {
+            const distribuidoraPropia = await prisma.distribuidora.findFirst({
+                where: { usuarioId: req.user!.id }
+            });
+
+            if (!distribuidoraPropia) {
+                return res.status(404).json({
+                    message: "No se encontro una distribuidora asociada al usuario en sesion"
+                });
+            }
+
+            whereClause.distribuidoraId = distribuidoraPropia.id;
+        } else if (distribuidora_id) {
+            whereClause.distribuidoraId = Number(distribuidora_id);
+        }
+
+        if (search) {
+            whereClause.OR = [
+                {
+                    cliente: {
+                        persona: {
+                            OR: [
+                                { nombre: { contains: String(search), mode: 'insensitive' } },
+                                { apellidoPaterno: { contains: String(search), mode: 'insensitive' } }
+                            ]
+                        }
+                    }
+                },
+                {
+                    distribuidora: {
+                        usuario: { username: { contains: String(search), mode: 'insensitive' } }
+                    }
+                }
+            ];
+        }
+
+        const [prevales, total] = await Promise.all([
+            prisma.prevale.findMany({
+                where: whereClause,
+                skip,
+                take: limitNumber,
+                include: {
+                    cliente: {
+                        select: {
+                            id: true,
+                            persona: { select: { nombre: true, apellidoPaterno: true, apellidoMaterno: true } }
+                        }
+                    },
+                    distribuidora: {
+                        select: {
+                            id: true,
+                            categoria: true,
+                            usuario: { select: { username: true } }
+                        }
+                    },
+                    coordinador: {
+                        select: {
+                            id: true,
+                            usuario: { select: { username: true } }
+                        }
+                    }
+                },
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma.prevale.count({ where: whereClause })
+        ]);
+
+        return res.status(200).json({
+            message: "Prevales obtenidos con exito",
+            data: prevales,
+            pagination: {
+                totalItems: total,
+                totalPages: Math.ceil(total / limitNumber),
+                currentPage: pageNumber,
+                limit: limitNumber
+            }
+        });
+    } catch (error: any) {
+        console.error("Error al obtener los prevales: ", error);
+        return res.status(500).json({
+            message: "Error al obtener los prevales",
+            error: error.message
+        });
+    }
+}
+//#endregion
+
 //#region Obtener Detalle Prevale
 export const obtenerDetallePrevale = async (req: Request, res: Response) => {
     const { id } = req.params;
@@ -474,6 +600,80 @@ export const obtenerDetallePrevale = async (req: Request, res: Response) => {
         console.error('Error al obtener el detalle del prevale: ', error);
         return res.status(500).json({
             message: 'Error al obtener el detalle del prevale',
+            error: error.message
+        });
+    }
+}
+//#endregion
+
+//#region Obtener Detalle Vale
+export const obtenerDetalleVale = async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        const vale = await prisma.vale.findUnique({
+            where: { id: Number(id) },
+            include: {
+                cliente: {
+                    include: { persona: true }
+                },
+                distribuidora: {
+                    include: { usuario: { select: { username: true, email: true } } }
+                },
+                prevale: {
+                    include: {
+                        coordinador: {
+                            include: { usuario: { select: { username: true } } }
+                        }
+                    }
+                },
+                pagos: { orderBy: { quincena: 'asc' } },
+                credito: {
+                    include: {
+                        pagosDistribuidor: { orderBy: { plazo: 'asc' } }
+                    }
+                }
+            }
+        });
+
+        if (!vale) {
+            return res.status(404).json({
+                message: "Vale no encontrado"
+            });
+        }
+
+        if (req.user!.rol === 'distribuidora') {
+            const distribuidoraPropia = await prisma.distribuidora.findFirst({
+                where: { usuarioId: req.user!.id }
+            });
+
+            if (!distribuidoraPropia || distribuidoraPropia.id !== vale.distribuidoraId) {
+                return res.status(403).json({
+                    message: "No tiene permiso para consultar este vale"
+                });
+            }
+        }
+
+        if (req.user!.rol === 'cajero') {
+            const empleadoCajero = await prisma.empleado.findFirst({
+                where: { usuarioId: req.user!.id }
+            });
+
+            if (!empleadoCajero || empleadoCajero.sucursalId !== vale.distribuidora.sucursalId) {
+                return res.status(403).json({
+                    message: "No tiene permiso para consultar vales de otra sucursal"
+                });
+            }
+        }
+
+        return res.status(200).json({
+            message: "Detalle de vale obtenido con exito",
+            data: vale
+        });
+    } catch (error: any) {
+        console.error("Error al obtener el detalle del vale: ", error);
+        return res.status(500).json({
+            message: "Error al obtener el detalle del vale",
             error: error.message
         });
     }

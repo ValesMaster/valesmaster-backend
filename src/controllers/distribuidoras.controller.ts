@@ -27,6 +27,75 @@ export const obtenerPerfil = async (req: Request, res: Response) => {
     }
 }
 
+//#region Obtener Distribuidoras
+export const obtenerDistribuidoras = async (req: Request, res: Response) => {
+    try {
+        const { page = '1', limit = '10', categoria, sucursal_id, search } = req.query;
+
+        const pageNumber = parseInt(page as string, 10);
+        const limitNumber = parseInt(limit as string, 10);
+        const skip = (pageNumber - 1) * limitNumber;
+
+        const whereClause: any = {};
+
+        if (categoria) {
+            whereClause.categoria = String(categoria);
+        }
+
+        if (sucursal_id) {
+            whereClause.sucursalId = Number(sucursal_id);
+        }
+
+        if (search) {
+            whereClause.usuario = {
+                OR: [
+                    { username: { contains: String(search), mode: 'insensitive' } },
+                    { email: { contains: String(search), mode: 'insensitive' } },
+                    { persona: { nombre: { contains: String(search), mode: 'insensitive' } } }
+                ]
+            };
+        }
+
+        const [distribuidoras, total] = await Promise.all([
+            prisma.distribuidora.findMany({
+                where: whereClause,
+                skip,
+                take: limitNumber,
+                include: {
+                    usuario: {
+                        select: {
+                            username: true,
+                            email: true,
+                            persona: { select: { nombre: true, apellidoPaterno: true, apellidoMaterno: true } }
+                        }
+                    },
+                    sucursal: { select: { id: true, nombre: true } }
+                },
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma.distribuidora.count({ where: whereClause })
+        ]);
+
+        return res.status(200).json({
+            message: "Distribuidoras obtenidas con exito",
+            data: distribuidoras,
+            pagination: {
+                totalItems: total,
+                totalPages: Math.ceil(total / limitNumber),
+                currentPage: pageNumber,
+                limit: limitNumber
+            }
+        });
+    } catch (error: any) {
+        console.error("Error al obtener distribuidoras: ", error);
+        return res.status(500).json({
+            message: "Error al obtener distribuidoras",
+            error: error.message
+        });
+    }
+}
+//#endregion
+
 //#region Obtener Clientes
 export const obtenerClientes = async (req: Request, res: Response) => {
     const { id_distribuidora } = req.body;

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-    crearPrevale, aprobarPrevale, obtenerVales, obtenerDetallePrevale,
+    crearPrevale, aprobarPrevale, obtenerVales, obtenerPrevales, obtenerDetallePrevale, obtenerDetalleVale,
     registrarPago, registrarPagoDistribuidora,
     obtenerConciliacionPagos, obtenerConciliacionPagosDistribuidora
 } from "../controllers/vales.controller";
@@ -12,7 +12,9 @@ const router = Router();
 router.post('/prevales/crear', verifyToken, requireRole('distribuidora'), crearPrevale);
 //requireVpn
 router.post('/prevales/aprobar/:id', verifyToken, requireRole('coordinador'), aprobarPrevale);
-router.get('/obtener', requireVpn, verifyToken, requireRole('gerente_general', 'gerente_sucursal'), obtenerVales);
+router.get('/obtener', verifyToken, requireRole('distribuidora', 'cajero', 'coordinador', 'gerente_general', 'gerente_sucursal'), obtenerVales);
+router.get('/detalle/:id', verifyToken, requireRole('distribuidora', 'cajero', 'coordinador', 'gerente_general', 'gerente_sucursal'), obtenerDetalleVale);
+router.get('/prevales/obtener', verifyToken, requireRole('distribuidora', 'coordinador', 'gerente_general', 'gerente_sucursal'), obtenerPrevales);
 router.get('/prevales/detalle/:id', verifyToken, requireRole('distribuidora', 'coordinador', 'gerente_general', 'gerente_sucursal'), obtenerDetallePrevale);
 router.post('/pagos/registrar/:id', verifyToken, requireRole('cajero'), registrarPago);
 router.post('/pagos-distribuidora/registrar/:id', verifyToken, requireRole('coordinador'), registrarPagoDistribuidora);

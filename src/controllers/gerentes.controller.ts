@@ -263,22 +263,31 @@ export const desactivarEmpleado = async (req: Request, res: Response) => {
             });
         }
 
-        const empleadoDesactivado = await prisma.usuario.update({
-            where: { id: Number(id) },
-            data: {
-                activo: false,
-                updatedAt: new Date(),
-                deletedAt: new Date()
-            },
-            include: {
-                persona: true,
-                rol: true,
-                empleados: {
-                    include: {
-                        sucursal: true
+        const empleadoDesactivado = await prisma.$transaction(async (tx) => {
+            const usuarioActualizado = await tx.usuario.update({
+                where: { id: Number(id) },
+                data: {
+                    activo: false,
+                    updatedAt: new Date(),
+                    deletedAt: new Date()
+                },
+                include: {
+                    persona: true,
+                    rol: true,
+                    empleados: {
+                        include: {
+                            sucursal: true
+                        }
                     }
                 }
-            }
+            });
+
+            await tx.empleado.updateMany({
+                where: { usuarioId: Number(id) },
+                data: { deletedAt: new Date() }
+            });
+
+            return usuarioActualizado;
         });
 
         registerAudit({
