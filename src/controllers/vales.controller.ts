@@ -772,3 +772,162 @@ export const registrarPagoDistribuidora = async (req: Request, res: Response) =>
     }
 }
 //#endregion
+
+//#region Conciliacion Pagos (Cliente -> Distribuidora)
+export const obtenerConciliacionPagos = async (req: Request, res: Response) => {
+    try {
+        const { page = '1', limit = '10', distribuidora_id } = req.query;
+
+        const pageNumber = parseInt(page as string, 10);
+        const limitNumber = parseInt(limit as string, 10);
+        const skip = (pageNumber - 1) * limitNumber;
+
+        const valeFilter: any = {};
+
+        if (distribuidora_id) {
+            valeFilter.distribuidoraId = Number(distribuidora_id);
+        }
+
+        if (req.user!.rol === 'cajero') {
+            const empleadoCajero = await prisma.empleado.findFirst({
+                where: { usuarioId: req.user!.id }
+            });
+
+            if (!empleadoCajero) {
+                return res.status(404).json({
+                    message: "No se encontro un empleado asociado al usuario en sesion"
+                });
+            }
+
+            valeFilter.distribuidora = { sucursalId: empleadoCajero.sucursalId };
+        }
+
+        const hoy = new Date();
+
+        const whereClause: any = {
+            estado: 'PENDIENTE',
+            fechaCorte: { lt: hoy },
+            ...(Object.keys(valeFilter).length > 0 ? { vale: valeFilter } : {})
+        };
+
+        const [pagos, total] = await Promise.all([
+            prisma.pago.findMany({
+                where: whereClause,
+                skip,
+                take: limitNumber,
+                include: {
+                    vale: {
+                        include: {
+                            cliente: { include: { persona: true } },
+                            distribuidora: { include: { usuario: { select: { username: true } } } }
+                        }
+                    }
+                },
+                orderBy: { fechaCorte: 'asc' }
+            }),
+            prisma.pago.count({ where: whereClause })
+        ]);
+
+        const pagosConAtraso = pagos.map(p => ({
+            ...p,
+            diasAtraso: Math.floor((hoy.getTime() - new Date(p.fechaCorte).getTime()) / 86400000)
+        }));
+
+        return res.status(200).json({
+            message: "Pagos pendientes de conciliar obtenidos con exito",
+            data: pagosConAtraso,
+            pagination: {
+                totalItems: total,
+                totalPages: Math.ceil(total / limitNumber),
+                currentPage: pageNumber,
+                limit: limitNumber
+            }
+        });
+    } catch (error: any) {
+        console.error("Error al obtener la conciliacion de pagos: ", error);
+        return res.status(500).json({
+            message: "Error al obtener la conciliacion de pagos",
+            error: error.message
+        });
+    }
+}
+//#endregion
+
+//#region Conciliacion Pagos Distribuidora (Distribuidora -> Empresa)
+export const obtenerConciliacionPagosDistribuidora = async (req: Request, res: Response) => {
+    try {
+        const { page = '1', limit = '10', distribuidora_id } = req.query;
+
+        const pageNumber = parseInt(page as string, 10);
+        const limitNumber = parseInt(limit as string, 10);
+        const skip = (pageNumber - 1) * limitNumber;
+
+        const creditoFilter: any = {};
+
+        if (distribuidora_id) {
+            creditoFilter.distribuidoraId = Number(distribuidora_id);
+        }
+
+        if (req.user!.rol === 'cajero') {
+            const empleadoCajero = await prisma.empleado.findFirst({
+                where: { usuarioId: req.user!.id }
+            });
+
+            if (!empleadoCajero) {
+                return res.status(404).json({
+                    message: "No se encontro un empleado asociado al usuario en sesion"
+                });
+            }
+
+            creditoFilter.distribuidora = { sucursalId: empleadoCajero.sucursalId };
+        }
+
+        const hoy = new Date();
+
+        const whereClause: any = {
+            fechaPago: null,
+            fechaCorte: { lt: hoy },
+            ...(Object.keys(creditoFilter).length > 0 ? { credito: creditoFilter } : {})
+        };
+
+        const [pagos, total] = await Promise.all([
+            prisma.pagosDistribuidora.findMany({
+                where: whereClause,
+                skip,
+                take: limitNumber,
+                include: {
+                    credito: {
+                        include: {
+                            distribuidora: { include: { usuario: { select: { username: true } } } }
+                        }
+                    }
+                },
+                orderBy: { fechaCorte: 'asc' }
+            }),
+            prisma.pagosDistribuidora.count({ where: whereClause })
+        ]);
+
+        const pagosConAtraso = pagos.map(p => ({
+            ...p,
+            diasAtraso: Math.floor((hoy.getTime() - new Date(p.fechaCorte).getTime()) / 86400000)
+        }));
+
+        return res.status(200).json({
+            message: "Pagos de distribuidora pendientes de conciliar obtenidos con exito",
+            data: pagosConAtraso,
+            pagination: {
+                totalItems: total,
+                totalPages: Math.ceil(total / limitNumber),
+                currentPage: pageNumber,
+                limit: limitNumber
+            }
+        });
+    } catch (error: any) {
+        console.error("Error al obtener la conciliacion de pagos de distribuidora: ", error);
+        return res.status(500).json({
+            message: "Error al obtener la conciliacion de pagos de distribuidora",
+            error: error.message
+        });
+    }
+}
+//#endregion

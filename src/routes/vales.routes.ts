@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { crearPrevale, aprobarPrevale, obtenerVales, obtenerDetallePrevale, registrarPago, registrarPagoDistribuidora } from "../controllers/vales.controller";
+import {
+    crearPrevale, aprobarPrevale, obtenerVales, obtenerDetallePrevale,
+    registrarPago, registrarPagoDistribuidora,
+    obtenerConciliacionPagos, obtenerConciliacionPagosDistribuidora
+} from "../controllers/vales.controller";
 import { verifyToken, requireRole } from "../middlewares/auth.middleware";
 import { requireVpn } from "../middlewares/vpn.middleware";
 
@@ -12,5 +16,7 @@ router.get('/obtener', requireVpn, verifyToken, requireRole('gerente_general', '
 router.get('/prevales/detalle/:id', verifyToken, requireRole('distribuidora', 'coordinador', 'gerente_general', 'gerente_sucursal'), obtenerDetallePrevale);
 router.post('/pagos/registrar/:id', verifyToken, requireRole('cajero'), registrarPago);
 router.post('/pagos-distribuidora/registrar/:id', verifyToken, requireRole('coordinador'), registrarPagoDistribuidora);
+router.get('/conciliaciones/pagos', requireVpn, verifyToken, requireRole('cajero', 'gerente_general', 'gerente_sucursal'), obtenerConciliacionPagos);
+router.get('/conciliaciones/pagos-distribuidora', requireVpn, verifyToken, requireRole('cajero', 'gerente_general', 'gerente_sucursal'), obtenerConciliacionPagosDistribuidora);
 
 export default router;
