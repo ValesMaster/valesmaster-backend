@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import prisma from "../lib/prisma";
+import prisma, { prismaRead } from "../lib/prisma";
 import { respondJwtError } from "../utils/jwtErrors";
 
 
@@ -35,7 +35,7 @@ export const getSecurityQuestions = async (
 
         }
 
-        const questions = await prisma.securityQuestion.findMany({
+        const questions = await prismaRead.securityQuestion.findMany({
 
             where: {
 

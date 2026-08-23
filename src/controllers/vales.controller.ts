@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../lib/prisma";
+import prisma, { prismaRead } from "../lib/prisma";
 import { parseId, parsePagination } from "../utils/validation";
 
 const TIPOS_VALE_PERMITIDOS = ['EFECTIVO', 'MERCANCIA'];
@@ -364,7 +364,7 @@ export const obtenerVales = async (req: Request, res: Response) => {
         }
 
         if (req.user!.rol === 'distribuidora') {
-            const distribuidoraPropia = await prisma.distribuidora.findFirst({
+            const distribuidoraPropia = await prismaRead.distribuidora.findFirst({
                 where: { usuarioId: req.user!.id }
             });
 
@@ -376,7 +376,7 @@ export const obtenerVales = async (req: Request, res: Response) => {
 
             whereClause.distribuidoraId = distribuidoraPropia.id;
         } else if (req.user!.rol === 'cajero') {
-            const empleadoCajero = await prisma.empleado.findFirst({
+            const empleadoCajero = await prismaRead.empleado.findFirst({
                 where: { usuarioId: req.user!.id }
             });
 
@@ -412,7 +412,7 @@ export const obtenerVales = async (req: Request, res: Response) => {
         }
 
         const [vales, total] = await Promise.all([
-            prisma.vale.findMany({
+            prismaRead.vale.findMany({
                 where: whereClause,
                 skip,
                 take: limitNumber,
@@ -433,7 +433,7 @@ export const obtenerVales = async (req: Request, res: Response) => {
                 },
                 orderBy: { createdAt: 'desc' }
             }),
-            prisma.vale.count({ where: whereClause })
+            prismaRead.vale.count({ where: whereClause })
         ]);
 
         return res.status(200).json({
@@ -469,7 +469,7 @@ export const obtenerPrevales = async (req: Request, res: Response) => {
         }
 
         if (req.user!.rol === 'distribuidora') {
-            const distribuidoraPropia = await prisma.distribuidora.findFirst({
+            const distribuidoraPropia = await prismaRead.distribuidora.findFirst({
                 where: { usuarioId: req.user!.id }
             });
 
@@ -505,7 +505,7 @@ export const obtenerPrevales = async (req: Request, res: Response) => {
         }
 
         const [prevales, total] = await Promise.all([
-            prisma.prevale.findMany({
+            prismaRead.prevale.findMany({
                 where: whereClause,
                 skip,
                 take: limitNumber,
@@ -532,7 +532,7 @@ export const obtenerPrevales = async (req: Request, res: Response) => {
                 },
                 orderBy: { createdAt: 'desc' }
             }),
-            prisma.prevale.count({ where: whereClause })
+            prismaRead.prevale.count({ where: whereClause })
         ]);
 
         return res.status(200).json({
@@ -567,7 +567,7 @@ export const obtenerDetallePrevale = async (req: Request, res: Response) => {
             });
         }
 
-        const prevale = await prisma.prevale.findUnique({
+        const prevale = await prismaRead.prevale.findUnique({
             where: { id: idPrevale },
             include: {
                 cliente: {
@@ -591,7 +591,7 @@ export const obtenerDetallePrevale = async (req: Request, res: Response) => {
         }
 
         if (req.user!.rol === 'distribuidora') {
-            const distribuidoraPropia = await prisma.distribuidora.findFirst({
+            const distribuidoraPropia = await prismaRead.distribuidora.findFirst({
                 where: { usuarioId: req.user!.id }
             });
 
@@ -628,7 +628,7 @@ export const obtenerDetalleVale = async (req: Request, res: Response) => {
             });
         }
 
-        const vale = await prisma.vale.findUnique({
+        const vale = await prismaRead.vale.findUnique({
             where: { id: idVale },
             include: {
                 cliente: {
@@ -660,7 +660,7 @@ export const obtenerDetalleVale = async (req: Request, res: Response) => {
         }
 
         if (req.user!.rol === 'distribuidora') {
-            const distribuidoraPropia = await prisma.distribuidora.findFirst({
+            const distribuidoraPropia = await prismaRead.distribuidora.findFirst({
                 where: { usuarioId: req.user!.id }
             });
 
@@ -672,7 +672,7 @@ export const obtenerDetalleVale = async (req: Request, res: Response) => {
         }
 
         if (req.user!.rol === 'cajero') {
-            const empleadoCajero = await prisma.empleado.findFirst({
+            const empleadoCajero = await prismaRead.empleado.findFirst({
                 where: { usuarioId: req.user!.id }
             });
 
@@ -1017,7 +1017,7 @@ export const obtenerConciliacionPagos = async (req: Request, res: Response) => {
         }
 
         if (req.user!.rol === 'cajero') {
-            const empleadoCajero = await prisma.empleado.findFirst({
+            const empleadoCajero = await prismaRead.empleado.findFirst({
                 where: { usuarioId: req.user!.id }
             });
 
@@ -1039,7 +1039,7 @@ export const obtenerConciliacionPagos = async (req: Request, res: Response) => {
         };
 
         const [pagos, total] = await Promise.all([
-            prisma.pago.findMany({
+            prismaRead.pago.findMany({
                 where: whereClause,
                 skip,
                 take: limitNumber,
@@ -1053,7 +1053,7 @@ export const obtenerConciliacionPagos = async (req: Request, res: Response) => {
                 },
                 orderBy: { fechaCorte: 'asc' }
             }),
-            prisma.pago.count({ where: whereClause })
+            prismaRead.pago.count({ where: whereClause })
         ]);
 
         const pagosConAtraso = pagos.map(p => ({
@@ -1094,7 +1094,7 @@ export const obtenerConciliacionPagosDistribuidora = async (req: Request, res: R
         }
 
         if (req.user!.rol === 'cajero') {
-            const empleadoCajero = await prisma.empleado.findFirst({
+            const empleadoCajero = await prismaRead.empleado.findFirst({
                 where: { usuarioId: req.user!.id }
             });
 
@@ -1116,7 +1116,7 @@ export const obtenerConciliacionPagosDistribuidora = async (req: Request, res: R
         };
 
         const [pagos, total] = await Promise.all([
-            prisma.pagosDistribuidora.findMany({
+            prismaRead.pagosDistribuidora.findMany({
                 where: whereClause,
                 skip,
                 take: limitNumber,
@@ -1129,7 +1129,7 @@ export const obtenerConciliacionPagosDistribuidora = async (req: Request, res: R
                 },
                 orderBy: { fechaCorte: 'asc' }
             }),
-            prisma.pagosDistribuidora.count({ where: whereClause })
+            prismaRead.pagosDistribuidora.count({ where: whereClause })
         ]);
 
         const pagosConAtraso = pagos.map(p => ({

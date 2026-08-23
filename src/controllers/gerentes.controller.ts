@@ -76,10 +76,6 @@ export const obtenerEmpleadosFiltrados = async (req: Request, res: Response) => 
 export const obtenerDetalleEmpleado = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-<<<<<<< HEAD
-        const empladoExistente = await prismaRead.usuario.findUnique({
-            where: { id: Number(id) },
-=======
         const idEmpleado = parseId(id);
 
         if (!idEmpleado) {
@@ -88,9 +84,8 @@ export const obtenerDetalleEmpleado = async (req: Request, res: Response) => {
             });
         }
 
-        const empladoExistente = await prisma.usuario.findUnique({
+        const empladoExistente = await prismaRead.usuario.findUnique({
             where: { id: idEmpleado },
->>>>>>> main
             include: {
                 rol: true,
                 persona: {
@@ -550,7 +545,7 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
 
 export const obtenerSucursalesSelector = async (req: Request, res: Response) => {
     try {
-        const sucursales = await prisma.sucursal.findMany({
+        const sucursales = await prismaRead.sucursal.findMany({
             where: { deletedAt: null },
             select: {
                 id: true,

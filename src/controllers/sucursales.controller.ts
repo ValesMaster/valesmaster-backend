@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../lib/prisma";
+import prisma, { prismaRead } from "../lib/prisma";
 import { registerAudit } from "../services/audit.service";
 
 const CODIGO_POSTAL_REGEX = /^\d{5}$/;
@@ -11,7 +11,7 @@ export const getSucursales = async (
   res: Response
 ): Promise<void> => {
   try {
-    const sucursales = await prisma.sucursal.findMany({
+    const sucursales = await prismaRead.sucursal.findMany({
       where: {
         deletedAt: null,
       },
@@ -54,7 +54,7 @@ export const getSucursalById = async (
       return;
     }
 
-    const sucursal = await prisma.sucursal.findFirst({
+    const sucursal = await prismaRead.sucursal.findFirst({
       where: {
         id,
         deletedAt: null,

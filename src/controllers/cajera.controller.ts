@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../lib/prisma";
+import prisma, { prismaRead } from "../lib/prisma";
 import { registerAudit } from "../services/audit.service";
 
 //#region Crear Canje
@@ -84,7 +84,7 @@ export const obtenerCanjes = async (req: Request, res: Response) => {
         const limitNumber = parseInt(limit as string, 10);
         const skip = (pageNumber - 1) * limitNumber;
 
-        const cajera = await prisma.empleado.findFirst({
+        const cajera = await prismaRead.empleado.findFirst({
             where: { usuarioId: req.user!.id }
         });
 
@@ -101,7 +101,7 @@ export const obtenerCanjes = async (req: Request, res: Response) => {
         }
 
         const [canjes, total] = await Promise.all([
-            prisma.canjePuntos.findMany({
+            prismaRead.canjePuntos.findMany({
                 where: whereClause,
                 skip,
                 take: limitNumber,
@@ -114,7 +114,7 @@ export const obtenerCanjes = async (req: Request, res: Response) => {
                 },
                 orderBy: { createdAt: 'desc' }
             }),
-            prisma.canjePuntos.count({ where: whereClause })
+            prismaRead.canjePuntos.count({ where: whereClause })
         ]);
 
         return res.status(200).json({
@@ -137,7 +137,7 @@ export const obtenerCanjes = async (req: Request, res: Response) => {
 // #region Obtener Distribuidoras
 export const obtenerDistribuidoras = async (req: Request, res: Response) => {
     try {
-        const empleadoCajero = await prisma.empleado.findFirst({
+        const empleadoCajero = await prismaRead.empleado.findFirst({
             where: { usuarioId: Number(req.user!.id) }
         })
 
@@ -147,7 +147,7 @@ export const obtenerDistribuidoras = async (req: Request, res: Response) => {
             });
         }
 
-        const distribuidoras = await prisma.distribuidora.findMany({
+        const distribuidoras = await prismaRead.distribuidora.findMany({
             where: { sucursalId: Number(empleadoCajero?.sucursalId) },
             include: { usuario: true }
         });

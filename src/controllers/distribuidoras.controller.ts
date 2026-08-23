@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
-import prisma from "../lib/prisma";
+import prisma, { prismaRead } from "../lib/prisma";
 import { registerAudit } from "../services/audit.service";
 import { parseId, parsePagination } from "../utils/validation";
 
 //#region Obtener Perfil
 export const obtenerPerfil = async (req: Request, res: Response) => {
     try {
-        const distribuidora = await prisma.distribuidora.findFirst({
+        const distribuidora = await prismaRead.distribuidora.findFirst({
             where: { usuarioId: req.user!.id },
             include: {
                 usuario: {
@@ -56,7 +56,7 @@ export const obtenerDistribuidoras = async (req: Request, res: Response) => {
         }
 
         const [distribuidoras, total] = await Promise.all([
-            prisma.distribuidora.findMany({
+            prismaRead.distribuidora.findMany({
                 where: whereClause,
                 skip,
                 take: limitNumber,
@@ -72,7 +72,7 @@ export const obtenerDistribuidoras = async (req: Request, res: Response) => {
                 },
                 orderBy: { createdAt: 'desc' }
             }),
-            prisma.distribuidora.count({ where: whereClause })
+            prismaRead.distribuidora.count({ where: whereClause })
         ]);
 
         return res.status(200).json({
@@ -101,7 +101,7 @@ export const obtenerClientes = async (req: Request, res: Response) => {
         let distribuidoraId: number | undefined;
 
         if (req.user!.rol === 'distribuidora') {
-            const distribuidoraPropia = await prisma.distribuidora.findFirst({
+            const distribuidoraPropia = await prismaRead.distribuidora.findFirst({
                 where: { usuarioId: req.user!.id }
             });
 
@@ -124,7 +124,7 @@ export const obtenerClientes = async (req: Request, res: Response) => {
             distribuidoraId = idDistribuidora;
         }
 
-        const clientes = await prisma.cliente.findMany({
+        const clientes = await prismaRead.cliente.findMany({
             where: { distribuidoraId },
             include: { persona: true }
         });
@@ -257,7 +257,7 @@ export const obtenerDetalleCliente = async (req: Request, res: Response) => {
             });
         }
 
-        const clienteExistente = await prisma.cliente.findUnique({
+        const clienteExistente = await prismaRead.cliente.findUnique({
             where: { id: idCliente },
             include: {
                 persona: true

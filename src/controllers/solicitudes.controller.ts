@@ -762,10 +762,6 @@ export const getPresolicitudDetalle = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
-<<<<<<< HEAD
-        const presolicitud = await prismaRead.presolicitud.findUnique({
-            where: { id: Number(id) },
-=======
         const idPresolicitud = parseId(id);
 
         if (!idPresolicitud) {
@@ -774,9 +770,8 @@ export const getPresolicitudDetalle = async (req: Request, res: Response) => {
             });
         }
 
-        const presolicitud = await prisma.presolicitud.findUnique({
+        const presolicitud = await prismaRead.presolicitud.findUnique({
             where: { id: idPresolicitud },
->>>>>>> main
             include: {
                 persona: {
                     include: {

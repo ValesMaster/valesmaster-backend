@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import prisma from '../lib/prisma';
+import prisma, { prismaRead } from '../lib/prisma';
 
 //#region Register Test
 // ESTE METODO DE REGISTRO ES PARA CREAR USUARIOS PARA PROBAR LAS FASES DE LOGIN
@@ -301,7 +301,7 @@ export const validateToken = async (req: Request, res: Response) => {
 
 export const obtenerRoles = async (req: Request, res: Response) => {
     try {
-        const roles = await prisma.rol.findMany({
+        const roles = await prismaRead.rol.findMany({
             select: {
                 nombre: true,
                 id: true
