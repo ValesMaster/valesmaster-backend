@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma';
 
+//#region Register Test
 // ESTE METODO DE REGISTRO ES PARA CREAR USUARIOS PARA PROBAR LAS FASES DE LOGIN
 export const registerTest = async (req: Request, res: Response) => {
     try {
@@ -67,10 +68,10 @@ export const registerTest = async (req: Request, res: Response) => {
                 persona: true
             }
         });
-        
-        if (rolExiste.cantidadMfa === 3) {for (const item of securityQuestions) 
-            {
-                const answerHash = await bcrypt.hash( item.answer,10);
+
+        if (rolExiste.cantidadMfa === 3) {
+            for (const item of securityQuestions) {
+                const answerHash = await bcrypt.hash(item.answer, 10);
                 await prisma.securityQuestion.create({
                     data: {
                         userId: newUser.id,
@@ -113,6 +114,7 @@ export const registerTest = async (req: Request, res: Response) => {
     }
 }
 
+//#region Login 1MFA
 export const loginPhaseOne = async (req: Request, res: Response) => {
     const { email, password } = req.body;
     const ipAddress = req.ip || req.socket.remoteAddress || '0.0.0.0';
@@ -234,6 +236,7 @@ export const loginPhaseOne = async (req: Request, res: Response) => {
     }
 }
 
+//#region Validate Token
 export const validateToken = async (req: Request, res: Response) => {
     try {
         const auth = req.headers.authorization;
@@ -292,6 +295,32 @@ export const validateToken = async (req: Request, res: Response) => {
         console.error('Error al validar token', error);
         return res.status(500).json({
             message: 'Error interno del servidor'
+        });
+    }
+}
+
+export const obtenerRoles = async (req: Request, res: Response) => {
+    try {
+        const roles = await prisma.rol.findMany({
+            select: {
+                nombre: true,
+                id: true
+            }
+        });
+
+        if (!roles) {
+            return res.status(404).json({
+                message: 'No se encontraron los roles'
+            });
+        }
+
+        return res.status(200).json({
+            message: 'Roles obtenidos con exito',
+            data: roles
+        });
+    } catch {
+        return res.status(500).json({
+            message: 'No se pudo obtener los roles'
         });
     }
 }

@@ -11,30 +11,31 @@ Esta guía detalla los endpoints relacionados con el ciclo de vida de las solici
 ## 1. Crear Presolicitud (`POST /crear`)
 
 ### Descripción
-Crea una nueva presolicitud registrando en bloque la información de la Persona, su Dirección, y sus relaciones complejas de vehículos, negocios y familiares directos.
+Crea una nueva presolicitud registrando en bloque la información de la Persona, su Dirección, y sus relaciones complejas de vehículos, negocios y familiares directos. También maneja la subida de los 4 documentos del solicitante.
 
 * **URL:** `/api/solicitudes/crear`
 * **Método:** `POST`
 * **Headers:** 
-  * `Content-Type: application/json`
+  * `Content-Type: multipart/form-data`
 
-### Cuerpo de la Petición (`req.body`)
-Recibe un objeto JSON con estructuras anidadas para vehículos, negocios y familiares:
+### Cuerpo de la Petición (`FormData`)
+Debido a que este endpoint soporta la subida de archivos físicos, el cuerpo de la petición debe enviarse utilizando la interfaz `FormData` en el cliente. Los campos se distribuyen de la siguiente manera:
 
-| Campo / Objeto | Tipo | Requerido | Descripción |
+| Campo | Tipo | Requerido | Descripción |
 | :--- | :--- | :--- | :--- |
-| **Datos de Persona** | | | |
+| **Datos de Persona (Texto)** | | | |
 | `nombre` | String | **Sí** | Nombre(s) del solicitante. |
 | `apellido_paterno`| String | **Sí** | Apellido paterno. |
 | `apellido_materno`| String | No | Apellido materno. |
 | `fecha_nacimiento`| String | **Sí** | Fecha de nacimiento (ej. `YYYY-MM-DD`). |
 | `telefono` | String | **Sí** | Teléfono de contacto. |
 | `genero` | String | **Sí** | Género (ej. `Femenino`, `Masculino`). |
-| `curp` | String | **Sí** | CURP del solicitante. |
-| `rfc` | String | **Sí** | RFC del solicitante. |
-| `ine` | String | No | Identificación INE o pasaporte. |
-| `comprobante_domicilio` | String | No | Ruta o enlace al comprobante de domicilio. |
-| **Datos de Dirección** | | | |
+| **Documentos (Archivos)** | | | |
+| `ine` | Archivo (File) | No | Identificación INE o pasaporte (PDF, PNG o JPEG. Máx. 5MB). |
+| `rfc` | Archivo (File) | No | Cédula de identificación fiscal RFC (PDF, PNG o JPEG. Máx. 5MB). |
+| `curp` | Archivo (File) | No | Clave Única de Registro de Población (PDF, PNG o JPEG. Máx. 5MB). |
+| `comprobante_domicilio` | Archivo (File) | No | Comprobante de domicilio (PDF, PNG o JPEG. Máx. 5MB). |
+| **Datos de Dirección (Texto)** | | | |
 | `estado` | String | **Sí** | Estado. |
 | `municipio` | String | **Sí** | Municipio o alcaldía. |
 | `codigo_postal`| String | **Sí** | Código Postal. |
@@ -43,14 +44,14 @@ Recibe un objeto JSON con estructuras anidadas para vehículos, negocios y famil
 | `numero_exterior`| String | **Sí** | Número exterior. |
 | `numero_interior`| String | No | Número interior. |
 | `referencia` | String | No | Referencias físicas del domicilio. |
-| **Datos de Presolicitud** | | | |
-| `sucursal_id` | Number | **Sí** | ID de la sucursal de vinculación. |
-| `coordinador_id`| Number | No | ID del empleado coordinador asignado. |
+| **Datos de Presolicitud (Texto)** | | | |
+| `sucursal_id` | Number/String | **Sí** | ID de la sucursal de vinculación. |
+| `coordinador_id`| Number/String | No | ID del empleado coordinador asignado. |
 | `correo_solicitante`| String| **Sí** | Correo electrónico de contacto de la futura distribuidora. |
-| **Colecciones Anidadas** | | | |
-| `vehiculos` | Array | No | Colección de vehículos del solicitante (ver estructura abajo). |
-| `negocios` | Array | **Sí** | Colección de negocios del solicitante (mínimo 1 requerido). |
-| `familiares` | Array | **Sí** | Colección de familiares directos (mínimo 1 requerido). |
+| **Colecciones (JSON Strings)** | | | |
+| `vehiculos` | String (JSON) | No | Colección de vehículos del solicitante (ver estructura abajo). Debe ser un string en formato JSON (`JSON.stringify`). |
+| `negocios` | String (JSON) | **Sí** | Colección de negocios del solicitante (mínimo 1 requerido). Debe ser un string en formato JSON (`JSON.stringify`). |
+| `familiares` | String (JSON) | **Sí** | Colección de familiares directos (mínimo 1 requerido). Debe ser un string en formato JSON (`JSON.stringify`). |
 
 #### Estructura de Objetos de la Colección `vehiculos` (Opcional)
 * `marca` (String): Marca del vehículo (ej: `Toyota`).
@@ -74,58 +75,164 @@ Recibe un objeto JSON con estructuras anidadas para vehículos, negocios y famil
 * `telefono` (String): Teléfono del familiar.
 * `relacion` (String): Relación de parentesco (ej. `Padre`, `Madre`, `Hermano/a`).
 
-### Ejemplo de Petición
-```json
-{
-  "nombre": "Carlos",
-  "apellido_paterno": "Ruiz",
-  "apellido_materno": "Espinoza",
-  "fecha_nacimiento": "1988-11-23",
-  "telefono": "3339876543",
-  "genero": "Masculino",
-  "curp": "RUEC881123HDFXNS01",
-  "rfc": "RUEC881123XX3",
-  "ine": "INE-CARLOS-RUIZ",
-  "comprobante_domicilio": "comprobante_carlos.pdf",
-  "estado": "Jalisco",
-  "municipio": "Zapopan",
-  "codigo_postal": "45130",
-  "colonia": "Constitución",
-  "calle": "Manuel M. Diéguez",
-  "numero_exterior": "124",
-  "numero_interior": null,
-  "referencia": "A espaldas de la primaria",
-  "sucursal_id": 1,
-  "coordinador_id": 2,
-  "correo_solicitante": "carlos.ruiz@example.com",
-  "vehiculos": [
+### Ejemplo de Uso en el Frontend (Next.js / TypeScript)
+
+A continuación se muestra cómo estructurar el componente y la lógica de envío en Next.js utilizando `FormData` para adjuntar los campos de texto, las colecciones serializadas en JSON y los 4 archivos correspondientes:
+
+```tsx
+import React, { useState } from 'react';
+
+interface Vehiculo {
+  marca: string;
+  modelo: string;
+  placas: string;
+  ano: string;
+  color: string;
+  tipoVehiculo: string;
+}
+
+interface Negocio {
+  nombre: string;
+  sucursal: string;
+  telefono: string;
+  carta: string;
+  antiguedad: string;
+}
+
+interface Familiar {
+  nombre: string;
+  apellido_paterno: string;
+  apellido_materno?: string;
+  telefono: string;
+  relacion: string;
+}
+
+export default function CrearPresolicitudForm() {
+  // Estado para campos de texto simples
+  const [formData, setFormData] = useState({
+    nombre: 'Carlos',
+    apellido_paterno: 'Ruiz',
+    apellido_materno: 'Espinoza',
+    fecha_nacimiento: '1988-11-23',
+    telefono: '3339876543',
+    genero: 'Masculino',
+    estado: 'Jalisco',
+    municipio: 'Zapopan',
+    codigo_postal: '45130',
+    colonia: 'Constitución',
+    calle: 'Manuel M. Diéguez',
+    numero_exterior: '124',
+    numero_interior: '',
+    referencia: 'A espaldas de la primaria',
+    sucursal_id: '1',
+    coordinador_id: '2',
+    correo_solicitante: 'carlos.ruiz@example.com'
+  });
+
+  // Estado para archivos
+  const [ineFile, setIneFile] = useState<File | null>(null);
+  const [rfcFile, setRfcFile] = useState<File | null>(null);
+  const [curpFile, setCurpFile] = useState<File | null>(null);
+  const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
+
+  // Colecciones estructuradas
+  const vehiculos: Vehiculo[] = [
     {
-      "marca": "Nissan",
-      "modelo": "Versa",
-      "placas": "JXY-98-34",
-      "ano": "2020",
-      "color": "Gris",
-      "tipoVehiculo": "Sedán"
+      marca: 'Nissan',
+      modelo: 'Versa',
+      placas: 'JXY-98-34',
+      ano: '2020',
+      color: 'Gris',
+      tipoVehiculo: 'Sedán'
     }
-  ],
-  "negocios": [
+  ];
+
+  const negocios: Negocio[] = [
     {
-      "nombre": "Abarrotes Don Carlos",
-      "sucursal": "Zapopan Centro",
-      "telefono": "3331112222",
-      "carta": "carta_constancia.pdf",
-      "antiguedad": "2015-09-01"
+      nombre: 'Abarrotes Don Carlos',
+      sucursal: 'Zapopan Centro',
+      telefono: '3331112222',
+      carta: 'carta_constancia.pdf',
+      antiguedad: '2015-09-01'
     }
-  ],
-  "familiares": [
+  ];
+
+  const familiares: Familiar[] = [
     {
-      "nombre": "María Luisa",
-      "apellido_paterno": "Espinoza",
-      "apellido_materno": "Velasco",
-      "telefono": "3335556666",
-      "relacion": "Madre"
+      nombre: 'María Luisa',
+      apellido_paterno: 'Espinoza',
+      apellido_materno: 'Velasco',
+      telefono: '3335556666',
+      relacion: 'Madre'
     }
-  ]
+  ];
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const data = new FormData();
+
+    // 1. Agregar campos de texto individuales
+    Object.entries(formData).forEach(([key, value]) => {
+      data.append(key, value);
+    });
+
+    // 2. Agregar los archivos físicos
+    if (ineFile) data.append('ine', ineFile);
+    if (rfcFile) data.append('rfc', rfcFile);
+    if (curpFile) data.append('curp', curpFile);
+    if (comprobanteFile) data.append('comprobante_domicilio', comprobanteFile);
+
+    // 3. Serializar colecciones complejas como JSON strings
+    data.append('vehiculos', JSON.stringify(vehiculos));
+    data.append('negocios', JSON.stringify(negocios));
+    data.append('familiares', JSON.stringify(familiares));
+
+    try {
+      const response = await fetch('http://localhost:3000/api/solicitudes/crear', {
+        method: 'POST',
+        // IMPORTANTE: Al enviar FormData, NO se debe definir la cabecera 'Content-Type' manualmente.
+        // El navegador detectará FormData e inyectará 'multipart/form-data' junto con la clave boundary.
+        body: data,
+      });
+
+      const resJson = await response.json();
+
+      if (response.ok) {
+        alert(`Presolicitud creada con éxito. Folio: ${resJson.data.folio}`);
+      } else {
+        alert(`Error: ${resJson.message}`);
+      }
+    } catch (error) {
+      console.error('Error al realizar la petición:', error);
+      alert('Error en la conexión con el servidor.');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      {/* Ejemplo simple de inputs para archivos */}
+      <div>
+        <label>Identificación (INE/Pasaporte):</label>
+        <input type="file" accept="image/*,application/pdf" onChange={(e) => setIneFile(e.target.files?.[0] || null)} />
+      </div>
+      <div>
+        <label>Cédula de RFC:</label>
+        <input type="file" accept="image/*,application/pdf" onChange={(e) => setRfcFile(e.target.files?.[0] || null)} />
+      </div>
+      <div>
+        <label>CURP:</label>
+        <input type="file" accept="image/*,application/pdf" onChange={(e) => setCurpFile(e.target.files?.[0] || null)} />
+      </div>
+      <div>
+        <label>Comprobante de Domicilio:</label>
+        <input type="file" accept="image/*,application/pdf" onChange={(e) => setComprobanteFile(e.target.files?.[0] || null)} />
+      </div>
+      <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
+        Enviar Presolicitud
+      </button>
+    </form>
+  );
 }
 ```
 
@@ -601,4 +708,183 @@ Obtiene el desglose absoluto de una presolicitud por su ID único. Retorna la in
     "message": "Error al obtener el detalle de la presolicitud",
     "error": "..."
   }
+  ```
+
+---
+
+## 7. Obtener Archivo (`GET /archivos/:nombreArchivo`)
+
+### Descripción
+Permite consultar, visualizar o descargar los archivos adjuntos (INE, RFC, CURP, Comprobante de Domicilio) que fueron previamente subidos y asociados a las personas en el proceso de presolicitud.
+
+* **URL:** `/api/solicitudes/archivos/:nombreArchivo`
+* **Método:** `GET`
+
+### Parámetros de Ruta (`req.params`)
+| Campo | Tipo | Requerido | Descripción |
+| :--- | :--- | :--- | :--- |
+| `nombreArchivo` | String | **Sí** | El nombre completo y único del archivo que está almacenado en la base de datos (por ejemplo, `1723924265000-848392019-ine.pdf`). |
+
+### Respuestas
+
+#### Respuesta Exitosa (`200 OK`)
+Devuelve el flujo binario del archivo original con su respectiva cabecera `Content-Type` configurada automáticamente de acuerdo al tipo MIME registrado (`image/jpeg`, `image/png`, `application/pdf`).
+
+#### Respuestas de Error Comunes
+
+* **`400 Bad Request` (Parámetros inválidos)**
+  ```json
+  {
+    "message": "Nombre de archivo invalido"
+  }
+  ```
+
+* **`404 Not Found` (Archivo inexistente)**
+  ```json
+  {
+    "message": "Archivo no encontrado en el storage ni en respaldo"
+  }
+  ```
+
+---
+
+### Integración y Visualización en el Frontend (Next.js / TypeScript)
+
+En un entorno frontend moderno como Next.js, descargar o visualizar archivos binarios que requieren algún tipo de cabeceras o manejo seguro es sencillo. A continuación se presentan las dos opciones de visualización más comunes:
+
+#### Opción 1: Visualización Segura mediante fetch como Blob (Recomendado para endpoints protegidos)
+Si tu API requiere cabeceras de autorización (por ejemplo, un token JWT con `Authorization: Bearer <token>`), no puedes usar simplemente una etiqueta `<img src="..." />` o un `<iframe>`. Debes realizar la petición usando `fetch`, transformar la respuesta a un objeto `Blob` y crear una URL temporal.
+
+Aquí tienes un componente reutilizable de React en Next.js para visualizar PDFs o Imágenes de forma segura:
+
+```tsx
+import React, { useEffect, useState } from 'react';
+
+interface FileViewerProps {
+  fileName: string;
+  authToken?: string; // Token de autenticación si se requiere
+}
+
+export default function FileViewer({ fileName, authToken }: FileViewerProps) {
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [fileType, setFileType] = useState<'image' | 'pdf' | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+
+    const fetchFile = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const headers: HeadersInit = {};
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
+        const response = await fetch(`http://localhost:3000/api/solicitudes/archivos/${fileName}`, {
+          method: 'GET',
+          headers,
+        });
+
+        if (!response.ok) {
+          throw new Error('No se pudo obtener el archivo solicitado.');
+        }
+
+        // Detectar tipo MIME
+        const contentType = response.headers.get('Content-Type');
+        if (contentType?.includes('application/pdf')) {
+          setFileType('pdf');
+        } else if (contentType?.includes('image/')) {
+          setFileType('image');
+        } else {
+          setFileType(null); // Tipo no soportado para visualización directa
+        }
+
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+        setFileUrl(objectUrl);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message || 'Ocurrió un error al cargar el archivo.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (fileName) {
+      fetchFile();
+    }
+
+    // Limpieza de memoria al desmontar el componente
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [fileName, authToken]);
+
+  if (loading) return <div className="text-gray-500 text-sm">Cargando archivo...</div>;
+  if (error) return <div className="text-red-500 text-sm">Error: {error}</div>;
+  if (!fileUrl) return <div className="text-gray-400 text-sm">Archivo no disponible</div>;
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-2 bg-gray-50">
+      <div className="flex justify-between items-center mb-2 px-2">
+        <span className="font-semibold text-sm truncate max-w-xs">{fileName}</span>
+        <a 
+          href={fileUrl} 
+          download={fileName} 
+          className="text-xs bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 transition"
+        >
+          Descargar Archivo
+        </a>
+      </div>
+
+      <div className="w-full h-[500px] flex items-center justify-center bg-white rounded overflow-hidden">
+        {fileType === 'pdf' ? (
+          <iframe 
+            src={fileUrl} 
+            className="w-full h-full border-none" 
+            title="Visualizador de PDF"
+          />
+        ) : fileType === 'image' ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img 
+            src={fileUrl} 
+            alt="Archivo visualizado" 
+            className="max-w-full max-h-full object-contain"
+          />
+        ) : (
+          <div className="text-center p-4">
+            <p className="text-gray-500 mb-2">Este archivo no se puede visualizar directamente en el navegador.</p>
+            <p className="text-xs text-gray-400">Usa el botón superior para descargarlo.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+#### Opción 2: Enlace de Referencia Directa (Para endpoints públicos / sin token de cabecera)
+Si tu backend no requiere cabeceras HTTP especiales en el endpoint de visualización de archivos, o si la sesión se gestiona automáticamente por medio de Cookies (HTTPOnly), puedes enlazar directamente las URLs:
+
+* **Para Imágenes:**
+  ```tsx
+  <img 
+    src={`http://localhost:3000/api/solicitudes/archivos/${fileName}`} 
+    alt="Identificación Oficial" 
+    className="w-full object-cover"
+  />
+  ```
+
+* **Para Documentos PDF:**
+  ```tsx
+  <iframe 
+    src={`http://localhost:3000/api/solicitudes/archivos/${fileName}`} 
+    className="w-full h-[600px] border-none"
+  />
   ```
