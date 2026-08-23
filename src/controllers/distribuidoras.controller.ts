@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { registerAudit } from "../services/audit.service";
+import { parseId, parsePagination } from "../utils/validation";
 
 //#region Obtener Perfil
 export const obtenerPerfil = async (req: Request, res: Response) => {
@@ -30,11 +31,9 @@ export const obtenerPerfil = async (req: Request, res: Response) => {
 //#region Obtener Distribuidoras
 export const obtenerDistribuidoras = async (req: Request, res: Response) => {
     try {
-        const { page = '1', limit = '10', categoria, sucursal_id, search } = req.query;
+        const { page, limit, categoria, sucursal_id, search } = req.query;
 
-        const pageNumber = parseInt(page as string, 10);
-        const limitNumber = parseInt(limit as string, 10);
-        const skip = (pageNumber - 1) * limitNumber;
+        const { pageNumber, limitNumber, skip } = parsePagination(page, limit);
 
         const whereClause: any = {};
 
@@ -89,8 +88,7 @@ export const obtenerDistribuidoras = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al obtener distribuidoras: ", error);
         return res.status(500).json({
-            message: "Error al obtener distribuidoras",
-            error: error.message
+            message: "Error al obtener distribuidoras"
         });
     }
 }
@@ -100,7 +98,7 @@ export const obtenerDistribuidoras = async (req: Request, res: Response) => {
 export const obtenerClientes = async (req: Request, res: Response) => {
     const { id_distribuidora } = req.body;
     try {
-        let distribuidoraId = id_distribuidora ? Number(id_distribuidora) : undefined;
+        let distribuidoraId: number | undefined;
 
         if (req.user!.rol === 'distribuidora') {
             const distribuidoraPropia = await prisma.distribuidora.findFirst({
@@ -114,6 +112,16 @@ export const obtenerClientes = async (req: Request, res: Response) => {
             }
 
             distribuidoraId = distribuidoraPropia.id;
+        } else {
+            const idDistribuidora = parseId(id_distribuidora);
+
+            if (!idDistribuidora) {
+                return res.status(400).json({
+                    message: 'id_distribuidora es obligatorio y debe ser un numero valido'
+                });
+            }
+
+            distribuidoraId = idDistribuidora;
         }
 
         const clientes = await prisma.cliente.findMany({
@@ -147,6 +155,12 @@ export const crearCliente = async (req: Request, res: Response) => {
         estado, municipio, codigo_postal, colonia, calle, numero_exterior, numero_interior, referencia
     } = req.body
     try {
+        if (!nombre || !apellido_paterno || !estado || !municipio || !codigo_postal || !colonia || !calle || !numero_exterior) {
+            return res.status(400).json({
+                message: 'nombre, apellido_paterno, estado, municipio, codigo_postal, colonia, calle y numero_exterior son obligatorios'
+            });
+        }
+
         const distribuidoraExistente = await prisma.distribuidora.findFirst({
             where: { usuarioId: req.user!.id }
         });
@@ -235,8 +249,16 @@ export const obtenerDetalleCliente = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
+        const idCliente = parseId(id);
+
+        if (!idCliente) {
+            return res.status(400).json({
+                message: 'El ID del cliente no es valido'
+            });
+        }
+
         const clienteExistente = await prisma.cliente.findUnique({
-            where: { id: Number(id) },
+            where: { id: idCliente },
             include: {
                 persona: true
             }
@@ -265,8 +287,16 @@ export const modificarCliente = async (req: Request, res: Response) => {
     const body = req.body;
 
     try {
+        const idCliente = parseId(id);
+
+        if (!idCliente) {
+            return res.status(400).json({
+                message: 'El ID del cliente no es valido'
+            });
+        }
+
         const clienteExistente = await prisma.cliente.findUnique({
-            where: { id: Number(id) },
+            where: { id: idCliente },
             include: {
                 persona: {
                     include: {
@@ -304,7 +334,7 @@ export const modificarCliente = async (req: Request, res: Response) => {
             if (body.nombre !== undefined) personaData.nombre = body.nombre;
             if (body.apellido_paterno !== undefined) personaData.apellidoPaterno = body.apellido_paterno;
             if (body.apellido_materno !== undefined) personaData.apellidoMaterno = body.apellido_materno;
-            if (body.fecha_nacimiento !== undefined) personaData.fechaNacimiento = body.fecha_nacimiento;
+            if (body.fecha_nacimiento !== undefined) personaData.fechaNacimiento = new Date(body.fecha_nacimiento);
             if (body.telefono !== undefined) personaData.telefono = body.telefono;
             if (body.genero !== undefined) personaData.genero = body.genero;
 
@@ -316,7 +346,7 @@ export const modificarCliente = async (req: Request, res: Response) => {
             }
 
             return await tx.cliente.findUnique({
-                where: { id: Number(id) },
+                where: { id: idCliente },
                 include: {
                     persona: {
                         include: { direccion: true }
@@ -331,8 +361,7 @@ export const modificarCliente = async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         return res.status(500).json({
-            message: 'Error al modificar cliente',
-            error: error.message
+            message: 'Error al modificar cliente'
         });
     }
 }
@@ -342,8 +371,16 @@ export const eliminarCliente = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
+        const idCliente = parseId(id);
+
+        if (!idCliente) {
+            return res.status(400).json({
+                message: 'El ID del cliente no es valido'
+            });
+        }
+
         const clienteExistente = await prisma.cliente.findUnique({
-            where: { id: Number(id) },
+            where: { id: idCliente },
         });
 
         if (!clienteExistente) {
@@ -352,8 +389,14 @@ export const eliminarCliente = async (req: Request, res: Response) => {
             });
         }
 
+        if (clienteExistente.estado === 'INACTIVO') {
+            return res.status(400).json({
+                message: 'Este cliente ya se encuentra desactivado'
+            });
+        }
+
         const clienteDesactivado = await prisma.cliente.update({
-            where: { id: Number(clienteExistente.id) },
+            where: { id: clienteExistente.id },
             data: {
                 estado: 'INACTIVO',
                 updatedAt: new Date(),

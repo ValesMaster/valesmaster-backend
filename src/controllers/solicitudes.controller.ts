@@ -3,8 +3,12 @@ import bcrypt from "bcrypt"
 import prisma from "../lib/prisma";
 import path from "path";
 import fs from "fs";
+import { parseId, parsePagination, isValidEmail } from "../utils/validation";
 
-//#region Crear Presolicitud 
+const MAX_ITEMS_ARRAY = 20;
+const PASSWORD_MIN_LENGTH = 8;
+
+//#region Crear Presolicitud
 export const crearPresolicitud = async (req: Request, res: Response) => {
     const {
         //PERSONA
@@ -58,6 +62,48 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
     }
 
     try {
+        if (!nombre || !apellido_paterno || !fecha_nacimiento || !estado || !municipio || !codigo_postal || !colonia || !calle || !numero_exterior) {
+            return res.status(400).json({
+                message: "nombre, apellido_paterno, fecha_nacimiento, estado, municipio, codigo_postal, colonia, calle y numero_exterior son obligatorios"
+            });
+        }
+
+        if (correo_solicitante && !isValidEmail(correo_solicitante)) {
+            return res.status(400).json({
+                message: "correo_solicitante no tiene un formato valido"
+            });
+        }
+
+        if (!Array.isArray(parsedNegocios) || parsedNegocios.length === 0) {
+            return res.status(400).json({
+                message: "Es necesario enviar un arreglo valido de negocios"
+            });
+        }
+
+        if (!Array.isArray(parsedFamiliares) || parsedFamiliares.length === 0) {
+            return res.status(400).json({
+                message: "Se requiere un array valido de familiares"
+            });
+        }
+
+        if (parsedVehiculos !== undefined && !Array.isArray(parsedVehiculos)) {
+            return res.status(400).json({
+                message: "vehiculos debe ser un arreglo valido"
+            });
+        }
+
+        if (parsedNegocios.length > MAX_ITEMS_ARRAY || parsedFamiliares.length > MAX_ITEMS_ARRAY || (parsedVehiculos?.length ?? 0) > MAX_ITEMS_ARRAY) {
+            return res.status(400).json({
+                message: `Cada arreglo (vehiculos, negocios, familiares) admite maximo ${MAX_ITEMS_ARRAY} elementos`
+            });
+        }
+
+        if (parsedFamiliares.some((f: any) => !f.relacion)) {
+            return res.status(400).json({
+                message: "Cada familiar debe incluir el campo relacion"
+            });
+        }
+
         const empleadoCoordinador = await prisma.empleado.findFirst({
             where: { usuarioId: req.user!.id }
         });
@@ -145,18 +191,6 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
                 }
             });
 
-            if (!parsedFamiliares) {
-                return res.status(400).json({
-                    message: "Es necesario registrar a los familiares directos del solicitante"
-                });
-            }
-
-            if (!parsedNegocios) {
-                return res.status(400).json({
-                    message: "Es necesario registrar los negocios en los que el solicitante ha estado"
-                });
-            }
-
             if (parsedVehiculos && Array.isArray(parsedVehiculos) && parsedVehiculos.length > 0) {
                 for (const v of parsedVehiculos) {
                     const vehiculoCreado = await tx.vehiculo.create({
@@ -179,53 +213,41 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
                 }
             }
 
-            if (Array.isArray(parsedNegocios) && parsedNegocios.length > 0) {
-                for (const n of parsedNegocios) {
-                    const negocioCreado = await tx.negocio.create({
-                        data: {
-                            nombre: n.nombre,
-                            sucursal: n.sucursal,
-                            telefono: n.telefono
-                        }
-                    });
+            for (const n of parsedNegocios) {
+                const negocioCreado = await tx.negocio.create({
+                    data: {
+                        nombre: n.nombre,
+                        sucursal: n.sucursal,
+                        telefono: n.telefono
+                    }
+                });
 
-                    await tx.presolicitudesNegocio.create({
-                        data: {
-                            presolicitudId: presolicitud.id,
-                            negocioId: negocioCreado.id,
-                            carta: n.carta,
-                            antiguedad: n.antiguedad ? new Date(n.antiguedad) : null
-                        }
-                    });
-                }
-            } else {
-                return res.status(400).json({
-                    message: "Es necesario enviar un arreglo valido de negocios"
+                await tx.presolicitudesNegocio.create({
+                    data: {
+                        presolicitudId: presolicitud.id,
+                        negocioId: negocioCreado.id,
+                        carta: n.carta,
+                        antiguedad: n.antiguedad ? new Date(n.antiguedad) : null
+                    }
                 });
             }
 
-            if (Array.isArray(parsedFamiliares) && parsedFamiliares.length > 0) {
-                for (const f of parsedFamiliares) {
-                    const familiarCreado = await tx.persona.create({
-                        data: {
-                            nombre: f.nombre,
-                            apellidoPaterno: f.apellido_paterno,
-                            apellidoMaterno: f.apellido_materno,
-                            telefono: f.telefono
-                        }
-                    });
+            for (const f of parsedFamiliares) {
+                const familiarCreado = await tx.persona.create({
+                    data: {
+                        nombre: f.nombre,
+                        apellidoPaterno: f.apellido_paterno,
+                        apellidoMaterno: f.apellido_materno,
+                        telefono: f.telefono
+                    }
+                });
 
-                    await tx.presolicitudesFamiliar.create({
-                        data: {
-                            presolicitudId: presolicitud.id,
-                            familiarId: familiarCreado.id,
-                            relacion: f.relacion
-                        }
-                    });
-                }
-            } else {
-                return res.status(400).json({
-                    message: "Se requiere un array valido de familiares"
+                await tx.presolicitudesFamiliar.create({
+                    data: {
+                        presolicitudId: presolicitud.id,
+                        familiarId: familiarCreado.id,
+                        relacion: f.relacion
+                    }
                 });
             }
 
@@ -239,8 +261,7 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al crear la presolicitud: ", error);
         return res.status(500).json({
-            message: "Error al crear la presolicitud",
-            error: error.message
+            message: "Error al crear la presolicitud"
         });
     }
 }
@@ -252,6 +273,21 @@ export const validarPresolicitud = async (req: Request, res: Response) => {
     const estados_permitidos = ['VALIDADA', 'RECHAZADA'];
 
     try {
+        const idPresolicitud = parseId(id);
+
+        if (!idPresolicitud) {
+            return res.status(400).json({
+                message: "El ID de la presolicitud no es valido"
+            });
+        }
+
+        if (!estado || !estados_permitidos.includes(estado)) {
+            return res.status(400).json({
+                message: 'Estado invalido',
+                error: 'El estado debe ser VALIDADA o RECHAZADA'
+            });
+        }
+
         const empleadoValidador = await prisma.empleado.findFirst({
             where: { usuarioId: req.user!.id }
         });
@@ -263,7 +299,7 @@ export const validarPresolicitud = async (req: Request, res: Response) => {
         }
 
         const presolicitudExistente = await prisma.presolicitud.findUnique({
-            where: { id: Number(id) }
+            where: { id: idPresolicitud }
         });
 
         if (!presolicitudExistente) {
@@ -272,16 +308,16 @@ export const validarPresolicitud = async (req: Request, res: Response) => {
             });
         }
 
-        if (!estado || !estados_permitidos.includes(estado)) {
+        if (presolicitudExistente.estado !== 'PENDIENTE') {
             return res.status(400).json({
-                message: 'Estado invalido',
-                error: 'El estado debe ser VALIDADA o RECHAZADA'
+                message: "Esta presolicitud ya fue procesada",
+                error: `Estado actual: ${presolicitudExistente.estado}`
             });
         }
 
         const resultadoTransaccion = await prisma.$transaction(async (tx) => {
             const presolicitudActualizada = await tx.presolicitud.update({
-                where: { id: Number(id) },
+                where: { id: idPresolicitud },
                 data: {
                     estado: estado,
                     validadorId: empleadoValidador.id
@@ -322,12 +358,11 @@ export const validarPresolicitud = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al validar presolicitud: ", error)
         res.status(500).json({
-            message: "Error al validar presolicitud",
-            error: error.message
+            message: "Error al validar presolicitud"
         });
     }
 }
-//#region Aprobar 
+//#region Aprobar
 export const aprobarSolicitud = async (req: Request, res: Response) => {
     const { id } = req.params;
     const {
@@ -337,11 +372,33 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
     const estadosPermitidos = ['APROBADA', 'RECHAZADA']
 
     try {
+        const idSolicitud = parseId(id);
+
+        if (!idSolicitud) {
+            return res.status(400).json({
+                message: "El ID de la solicitud no es valido"
+            });
+        }
+
         if (!estadosPermitidos.includes(estado)) {
             return res.status(400).json({
                 message: 'Error al aprobar solicitud',
                 error: 'El estado solo puede ser APROBADA o RECHAZADA'
             })
+        }
+
+        if (estado === 'APROBADA') {
+            if (!user_name || !user_password) {
+                return res.status(400).json({
+                    message: "user_name y user_password son obligatorios para aprobar la solicitud"
+                });
+            }
+
+            if (String(user_password).length < PASSWORD_MIN_LENGTH) {
+                return res.status(400).json({
+                    message: `La contrasena debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres`
+                });
+            }
         }
 
         const empleadoGerente = await prisma.empleado.findFirst({
@@ -355,12 +412,19 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
         }
 
         const solicitudExistente = await prisma.solicitud.findUnique({
-            where: { id: Number(id) }
+            where: { id: idSolicitud }
         });
 
         if (!solicitudExistente) {
             return res.status(404).json({
                 message: 'No se encontro la solicitud'
+            });
+        }
+
+        if (solicitudExistente.estado !== 'PENDIENTE') {
+            return res.status(400).json({
+                message: "Esta solicitud ya fue procesada",
+                error: `Estado actual: ${solicitudExistente.estado}`
             });
         }
 
@@ -383,12 +447,20 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
         if (estado == 'APROBADA') {
             const resultadoAprobacion = await prisma.$transaction(async (tx) => {
                 const solicitudActualizada = await tx.solicitud.update({
-                    where: { id: Number(solicitudExistente.id) },
+                    where: { id: idSolicitud },
                     data: {
                         estado: estado,
                         gerenteId: empleadoGerente.id
                     }
                 });
+
+                const rolDistribuidora = await tx.rol.findFirst({
+                    where: { nombre: 'distribuidora' }
+                });
+
+                if (!rolDistribuidora) {
+                    throw new Error("No existe el rol 'distribuidora' en el sistema");
+                }
 
                 const salt = await bcrypt.genSalt(10);
                 const hashedPassword = await bcrypt.hash(user_password, salt);
@@ -398,7 +470,7 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
                         email: presolicitudRelacionada.correoSolicitante!,
                         username: user_name,
                         personaId: presolicitudRelacionada.personaId,
-                        rolId: 6,
+                        rolId: rolDistribuidora.id,
                         password: hashedPassword
                     }
                 });
@@ -470,7 +542,7 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
             });
         } else {
             const solicitudRechazada = await prisma.solicitud.update({
-                where: { id: Number(id) },
+                where: { id: idSolicitud },
                 data: {
                     estado: estado,
                     gerenteId: empleadoGerente.id
@@ -484,9 +556,9 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
         }
 
     } catch (error: any) {
+        console.error("Error al aprobar solicitud: ", error);
         return res.status(500).json({
-            message: "Error al aprobar presolicitud",
-            error: error.message
+            message: "Error al aprobar presolicitud"
         });
     }
 }
@@ -494,11 +566,9 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
 //#region Obtener Presolicitudes
 export const getPresolicitudes = async (req: Request, res: Response) => {
     try {
-        const { page = '1', limit = '10', estado, sucursal_id, search } = req.query;
+        const { page, limit, estado, sucursal_id, search } = req.query;
 
-        const pageNumber = parseInt(page as string, 10);
-        const limitNumber = parseInt(limit as string, 10);
-        const skip = (pageNumber - 1) * limitNumber;
+        const { pageNumber, limitNumber, skip } = parsePagination(page, limit);
 
         const whereClause: any = {};
 
@@ -599,8 +669,7 @@ export const getPresolicitudes = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al obtener presolicitudes: ", error);
         return res.status(500).json({
-            message: "Error al obtener presolicitudes",
-            error: error.message
+            message: "Error al obtener presolicitudes"
         });
     }
 };
@@ -609,11 +678,9 @@ export const getPresolicitudes = async (req: Request, res: Response) => {
 
 export const getSolicitudes = async (req: Request, res: Response) => {
     try {
-        const { page = '1', limit = '10', estado, gerente_id } = req.query;
+        const { page, limit, estado, gerente_id } = req.query;
 
-        const pageNumber = parseInt(page as string, 10);
-        const limitNumber = parseInt(limit as string, 10);
-        const skip = (pageNumber - 1) * limitNumber;
+        const { pageNumber, limitNumber, skip } = parsePagination(page, limit);
 
         const whereClause: any = {};
 
@@ -685,8 +752,7 @@ export const getSolicitudes = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al obtener solicitudes: ", error);
         return res.status(500).json({
-            message: "Error al obtener solicitudes",
-            error: error.message
+            message: "Error al obtener solicitudes"
         });
     }
 };
@@ -696,8 +762,16 @@ export const getPresolicitudDetalle = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
+        const idPresolicitud = parseId(id);
+
+        if (!idPresolicitud) {
+            return res.status(400).json({
+                message: "El ID de la presolicitud no es valido"
+            });
+        }
+
         const presolicitud = await prisma.presolicitud.findUnique({
-            where: { id: Number(id) },
+            where: { id: idPresolicitud },
             include: {
                 persona: {
                     include: {
@@ -747,8 +821,7 @@ export const getPresolicitudDetalle = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al obtener el detalle de la presolicitud: ", error);
         return res.status(500).json({
-            message: "Error al obtener el detalle de la presolicitud",
-            error: error.message
+            message: "Error al obtener el detalle de la presolicitud"
         });
     }
 };
@@ -756,9 +829,19 @@ export const getPresolicitudDetalle = async (req: Request, res: Response) => {
 //#region Obtener Archivos
 export const getArchivoPresolicitud = (req: Request, res: Response) => {
     const rawNombre = req.params.nombreArchivo;
-    const nombreArchivo = Array.isArray(rawNombre) ? rawNombre[0] : rawNombre
+    const nombreSinRuta = Array.isArray(rawNombre) ? rawNombre[0] : rawNombre;
 
-    if (!nombreArchivo) {
+    if (!nombreSinRuta) {
+        return res.status(400).json({
+            message: 'Nombre de archivo invalido'
+        })
+    }
+
+    // path.basename descarta cualquier componente de directorio (../, ..\, rutas absolutas)
+    // para evitar path traversal fuera de las carpetas de uploads.
+    const nombreArchivo = path.basename(nombreSinRuta);
+
+    if (!nombreArchivo || nombreArchivo !== nombreSinRuta) {
         return res.status(400).json({
             message: 'Nombre de archivo invalido'
         })

@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
+import { parseId, parsePagination } from "../utils/validation";
 
 const TIPOS_VALE_PERMITIDOS = ['EFECTIVO', 'MERCANCIA'];
 const ESTADOS_APROBACION_PERMITIDOS = ['APROBADO', 'RECHAZADO'];
+const PLAZOS_MAXIMO = 24;
 
 const COMISION_POR_CATEGORIA: Record<string, number> = {
     'Cobre': 0.03,
@@ -44,9 +46,9 @@ export const crearPrevale = async (req: Request, res: Response) => {
             });
         }
 
-        if (!Number.isInteger(plazosNum) || plazosNum <= 0) {
+        if (!Number.isInteger(plazosNum) || plazosNum <= 0 || plazosNum > PLAZOS_MAXIMO) {
             return res.status(400).json({
-                message: "plazos debe ser un numero entero mayor a 0"
+                message: `plazos debe ser un numero entero entre 1 y ${PLAZOS_MAXIMO}`
             });
         }
 
@@ -141,8 +143,7 @@ export const crearPrevale = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al crear el prevale: ", error);
         return res.status(500).json({
-            message: "Error al crear el prevale",
-            error: error.message
+            message: "Error al crear el prevale"
         });
     }
 }
@@ -154,6 +155,14 @@ export const aprobarPrevale = async (req: Request, res: Response) => {
     const { estado, motivo_rechazo } = req.body;
 
     try {
+        const idPrevale = parseId(id);
+
+        if (!idPrevale) {
+            return res.status(400).json({
+                message: "El ID del prevale no es valido"
+            });
+        }
+
         if (!estado || !ESTADOS_APROBACION_PERMITIDOS.includes(estado)) {
             return res.status(400).json({
                 message: "Estado invalido",
@@ -178,7 +187,7 @@ export const aprobarPrevale = async (req: Request, res: Response) => {
         }
 
         const prevale = await prisma.prevale.findUnique({
-            where: { id: Number(id) },
+            where: { id: idPrevale },
             include: { distribuidora: true }
         });
 
@@ -335,8 +344,7 @@ export const aprobarPrevale = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al aprobar el prevale: ", error);
         return res.status(500).json({
-            message: "Error al aprobar el prevale",
-            error: error.message
+            message: "Error al aprobar el prevale"
         });
     }
 }
@@ -345,11 +353,9 @@ export const aprobarPrevale = async (req: Request, res: Response) => {
 //#region Obtener Vales
 export const obtenerVales = async (req: Request, res: Response) => {
     try {
-        const { page = '1', limit = '10', estado, distribuidora_id, search } = req.query;
+        const { page, limit, estado, distribuidora_id, search } = req.query;
 
-        const pageNumber = parseInt(page as string, 10);
-        const limitNumber = parseInt(limit as string, 10);
-        const skip = (pageNumber - 1) * limitNumber;
+        const { pageNumber, limitNumber, skip } = parsePagination(page, limit);
 
         const whereClause: any = {};
 
@@ -443,8 +449,7 @@ export const obtenerVales = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error('Error al obtener los vales: ', error);
         return res.status(500).json({
-            message: 'Error al obtener los vales',
-            error: error.message
+            message: 'Error al obtener los vales'
         });
     }
 }
@@ -453,11 +458,9 @@ export const obtenerVales = async (req: Request, res: Response) => {
 //#region Obtener Prevales
 export const obtenerPrevales = async (req: Request, res: Response) => {
     try {
-        const { page = '1', limit = '10', estado, distribuidora_id, search } = req.query;
+        const { page, limit, estado, distribuidora_id, search } = req.query;
 
-        const pageNumber = parseInt(page as string, 10);
-        const limitNumber = parseInt(limit as string, 10);
-        const skip = (pageNumber - 1) * limitNumber;
+        const { pageNumber, limitNumber, skip } = parsePagination(page, limit);
 
         const whereClause: any = {};
 
@@ -545,8 +548,7 @@ export const obtenerPrevales = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al obtener los prevales: ", error);
         return res.status(500).json({
-            message: "Error al obtener los prevales",
-            error: error.message
+            message: "Error al obtener los prevales"
         });
     }
 }
@@ -557,8 +559,16 @@ export const obtenerDetallePrevale = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
+        const idPrevale = parseId(id);
+
+        if (!idPrevale) {
+            return res.status(400).json({
+                message: 'El ID del prevale no es valido'
+            });
+        }
+
         const prevale = await prisma.prevale.findUnique({
-            where: { id: Number(id) },
+            where: { id: idPrevale },
             include: {
                 cliente: {
                     include: { persona: true }
@@ -599,8 +609,7 @@ export const obtenerDetallePrevale = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error('Error al obtener el detalle del prevale: ', error);
         return res.status(500).json({
-            message: 'Error al obtener el detalle del prevale',
-            error: error.message
+            message: 'Error al obtener el detalle del prevale'
         });
     }
 }
@@ -611,8 +620,16 @@ export const obtenerDetalleVale = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
+        const idVale = parseId(id);
+
+        if (!idVale) {
+            return res.status(400).json({
+                message: "El ID del vale no es valido"
+            });
+        }
+
         const vale = await prisma.vale.findUnique({
-            where: { id: Number(id) },
+            where: { id: idVale },
             include: {
                 cliente: {
                     include: { persona: true }
@@ -673,8 +690,7 @@ export const obtenerDetalleVale = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al obtener el detalle del vale: ", error);
         return res.status(500).json({
-            message: "Error al obtener el detalle del vale",
-            error: error.message
+            message: "Error al obtener el detalle del vale"
         });
     }
 }
@@ -685,6 +701,14 @@ export const registrarPago = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
+        const idPago = parseId(id);
+
+        if (!idPago) {
+            return res.status(400).json({
+                message: "El ID del pago no es valido"
+            });
+        }
+
         const empleadoCajero = await prisma.empleado.findFirst({
             where: { usuarioId: req.user!.id }
         });
@@ -696,7 +720,7 @@ export const registrarPago = async (req: Request, res: Response) => {
         }
 
         const pago = await prisma.pago.findUnique({
-            where: { id: Number(id) },
+            where: { id: idPago },
             include: {
                 vale: {
                     include: { distribuidora: true }
@@ -863,8 +887,7 @@ export const registrarPago = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al registrar el pago: ", error);
         return res.status(500).json({
-            message: "Error al registrar el pago",
-            error: error.message
+            message: "Error al registrar el pago"
         });
     }
 }
@@ -876,6 +899,14 @@ export const registrarPagoDistribuidora = async (req: Request, res: Response) =>
     const { metodo_pago } = req.body;
 
     try {
+        const idPagoDistribuidora = parseId(id);
+
+        if (!idPagoDistribuidora) {
+            return res.status(400).json({
+                message: "El ID del pago no es valido"
+            });
+        }
+
         if (!metodo_pago) {
             return res.status(400).json({
                 message: "metodo_pago es obligatorio"
@@ -893,7 +924,7 @@ export const registrarPagoDistribuidora = async (req: Request, res: Response) =>
         }
 
         const pagoDistribuidora = await prisma.pagosDistribuidora.findUnique({
-            where: { id: Number(id) },
+            where: { id: idPagoDistribuidora },
             include: {
                 credito: true
             }
@@ -966,8 +997,7 @@ export const registrarPagoDistribuidora = async (req: Request, res: Response) =>
     } catch (error: any) {
         console.error("Error al registrar el pago de la distribuidora: ", error);
         return res.status(500).json({
-            message: "Error al registrar el pago de la distribuidora",
-            error: error.message
+            message: "Error al registrar el pago de la distribuidora"
         });
     }
 }
@@ -976,11 +1006,9 @@ export const registrarPagoDistribuidora = async (req: Request, res: Response) =>
 //#region Conciliacion Pagos (Cliente -> Distribuidora)
 export const obtenerConciliacionPagos = async (req: Request, res: Response) => {
     try {
-        const { page = '1', limit = '10', distribuidora_id } = req.query;
+        const { page, limit, distribuidora_id } = req.query;
 
-        const pageNumber = parseInt(page as string, 10);
-        const limitNumber = parseInt(limit as string, 10);
-        const skip = (pageNumber - 1) * limitNumber;
+        const { pageNumber, limitNumber, skip } = parsePagination(page, limit);
 
         const valeFilter: any = {};
 
@@ -1046,8 +1074,7 @@ export const obtenerConciliacionPagos = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error al obtener la conciliacion de pagos: ", error);
         return res.status(500).json({
-            message: "Error al obtener la conciliacion de pagos",
-            error: error.message
+            message: "Error al obtener la conciliacion de pagos"
         });
     }
 }
@@ -1056,11 +1083,9 @@ export const obtenerConciliacionPagos = async (req: Request, res: Response) => {
 //#region Conciliacion Pagos Distribuidora (Distribuidora -> Empresa)
 export const obtenerConciliacionPagosDistribuidora = async (req: Request, res: Response) => {
     try {
-        const { page = '1', limit = '10', distribuidora_id } = req.query;
+        const { page, limit, distribuidora_id } = req.query;
 
-        const pageNumber = parseInt(page as string, 10);
-        const limitNumber = parseInt(limit as string, 10);
-        const skip = (pageNumber - 1) * limitNumber;
+        const { pageNumber, limitNumber, skip } = parsePagination(page, limit);
 
         const creditoFilter: any = {};
 
@@ -1125,8 +1150,7 @@ export const obtenerConciliacionPagosDistribuidora = async (req: Request, res: R
     } catch (error: any) {
         console.error("Error al obtener la conciliacion de pagos de distribuidora: ", error);
         return res.status(500).json({
-            message: "Error al obtener la conciliacion de pagos de distribuidora",
-            error: error.message
+            message: "Error al obtener la conciliacion de pagos de distribuidora"
         });
     }
 }

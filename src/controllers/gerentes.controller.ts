@@ -2,16 +2,17 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import prisma from '../lib/prisma';
 import { registerAudit } from '../services/audit.service';
+import { parseId, parsePagination } from '../utils/validation';
 
+const ROLES_NO_EMPLEADO = ['distribuidora'];
+const PASSWORD_MIN_LENGTH = 8;
 
 // #region Obtiene empleados
 export const obtenerEmpleadosFiltrados = async (req: Request, res: Response) => {
     try {
-        const { roles, sucursalId, page = 1, limit = 10, search } = req.query;
+        const { roles, sucursalId, page, limit, search } = req.query;
 
-        const pageNumber = Number(page);
-        const pageSize = Number(limit);
-        const skip = (pageNumber - 1) * pageSize;
+        const { pageNumber, limitNumber: pageSize, skip } = parsePagination(page, limit);
 
         const whereClause: any = {
             activo: true,
@@ -65,8 +66,7 @@ export const obtenerEmpleadosFiltrados = async (req: Request, res: Response) => 
     } catch (error) {
         console.error('Error al obtener usuarios:', error);
         return res.status(500).json({
-            message: 'Ocurrió un error interno en el servidor',
-            error: error instanceof Error ? error.message : error
+            message: 'Ocurrió un error interno en el servidor'
         });
     }
 };
@@ -76,8 +76,16 @@ export const obtenerEmpleadosFiltrados = async (req: Request, res: Response) => 
 export const obtenerDetalleEmpleado = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
+        const idEmpleado = parseId(id);
+
+        if (!idEmpleado) {
+            return res.status(400).json({
+                message: 'El ID del empleado no es valido'
+            });
+        }
+
         const empladoExistente = await prisma.usuario.findUnique({
-            where: { id: Number(id) },
+            where: { id: idEmpleado },
             include: {
                 rol: true,
                 persona: {
@@ -111,8 +119,7 @@ export const obtenerDetalleEmpleado = async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         return res.status(500).json({
-            message: 'Error al obtener el detalle del empleado',
-            error: error.message
+            message: 'Error al obtener el detalle del empleado'
         });
     }
 }
@@ -127,16 +134,49 @@ export const crearEmpleado = async (req: Request, res: Response) => {
     } = req.body;
 
     try {
+        if (!nombre || !apellido_paterno || !rol_id || !username || !email || !password || !sucursal_id) {
+            return res.status(400).json({
+                message: 'nombre, apellido_paterno, rol_id, username, email, password y sucursal_id son obligatorios'
+            });
+        }
+
+        if (String(password).length < PASSWORD_MIN_LENGTH) {
+            return res.status(400).json({
+                message: `La contrasena debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres`
+            });
+        }
+
+        const rolIdNum = Number(rol_id);
+        const sucursalIdNum = Number(sucursal_id);
+
+        if (!Number.isInteger(rolIdNum) || !Number.isInteger(sucursalIdNum)) {
+            return res.status(400).json({
+                message: 'rol_id y sucursal_id deben ser numeros validos'
+            });
+        }
+
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         const creacionEmpleado = await prisma.$transaction(async (tx) => {
             const rolEncontrado = await tx.rol.findUnique({
-                where: { id: Number(rol_id) }
+                where: { id: rolIdNum }
             });
 
             if (!rolEncontrado) {
                 throw new Error('El rol especificado no existe');
+            }
+
+            if (ROLES_NO_EMPLEADO.includes(rolEncontrado.nombre)) {
+                throw new Error(`El rol '${rolEncontrado.nombre}' no puede asignarse a un empleado interno`);
+            }
+
+            const sucursalEncontrada = await tx.sucursal.findFirst({
+                where: { id: sucursalIdNum, deletedAt: null }
+            });
+
+            if (!sucursalEncontrada) {
+                throw new Error('La sucursal especificada no existe');
             }
 
             const direccionCreada = await tx.direccion.create({
@@ -157,7 +197,7 @@ export const crearEmpleado = async (req: Request, res: Response) => {
                     nombre,
                     apellidoPaterno: apellido_paterno,
                     apellidoMaterno: apellido_materno,
-                    fechaNacimiento: fecha_nacimiento,
+                    fechaNacimiento: fecha_nacimiento ? new Date(fecha_nacimiento) : null,
                     telefono,
                     genero,
                     direccionId: direccionCreada.id
@@ -169,7 +209,7 @@ export const crearEmpleado = async (req: Request, res: Response) => {
                     username,
                     email,
                     password: hashedPassword,
-                    rolId: Number(rol_id),
+                    rolId: rolIdNum,
                     activo: true,
                     personaId: personaCreada.id,
                     intentosFallidos: 0,
@@ -180,7 +220,7 @@ export const crearEmpleado = async (req: Request, res: Response) => {
 
             const empleadoCreado = await tx.empleado.create({
                 data: {
-                    sucursalId: sucursal_id,
+                    sucursalId: sucursalIdNum,
                     usuarioId: usuarioCreado.id
                 },
                 include: {
@@ -241,9 +281,21 @@ export const crearEmpleado = async (req: Request, res: Response) => {
             });
         }
 
+        const mensajesValidacion = [
+            'El rol especificado no existe',
+            'La sucursal especificada no existe'
+        ];
+
+        if (mensajesValidacion.includes(error.message) || error.message?.startsWith("El rol '")) {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+
         return res.status(500).json({
             success: false,
-            message: error.message || 'Ocurrió un error interno al registrar el empleado'
+            message: 'Ocurrió un error interno al registrar el empleado'
         });
     }
 }
@@ -253,19 +305,33 @@ export const crearEmpleado = async (req: Request, res: Response) => {
 export const desactivarEmpleado = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
+        const idEmpleado = parseId(id);
+
+        if (!idEmpleado) {
+            return res.status(400).json({
+                message: 'El ID del empleado no es valido'
+            });
+        }
+
         const empleadoExistente = await prisma.usuario.findUnique({
-            where: { id: Number(id) }
+            where: { id: idEmpleado }
         });
 
         if (!empleadoExistente) {
-            return res.status(500).json({
+            return res.status(404).json({
                 message: 'Empleado no encontrado',
+            });
+        }
+
+        if (!empleadoExistente.activo) {
+            return res.status(400).json({
+                message: 'Este empleado ya se encuentra desactivado'
             });
         }
 
         const empleadoDesactivado = await prisma.$transaction(async (tx) => {
             const usuarioActualizado = await tx.usuario.update({
-                where: { id: Number(id) },
+                where: { id: idEmpleado },
                 data: {
                     activo: false,
                     updatedAt: new Date(),
@@ -283,7 +349,7 @@ export const desactivarEmpleado = async (req: Request, res: Response) => {
             });
 
             await tx.empleado.updateMany({
-                where: { usuarioId: Number(id) },
+                where: { usuarioId: idEmpleado },
                 data: { deletedAt: new Date() }
             });
 
@@ -296,7 +362,7 @@ export const desactivarEmpleado = async (req: Request, res: Response) => {
             status: 'SUCCESS',
             req,
             details: {
-                usuarioId: Number(id),
+                usuarioId: idEmpleado,
                 username: empleadoExistente.username,
                 email: empleadoExistente.email
             }
@@ -321,8 +387,7 @@ export const desactivarEmpleado = async (req: Request, res: Response) => {
         });
 
         return res.status(500).json({
-            message: 'Error al desactivar empleado',
-            error: error.message
+            message: 'Error al desactivar empleado'
         });
     }
 }
@@ -334,8 +399,16 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
     const body = req.body;
 
     try {
+        const idEmpleado = parseId(id);
+
+        if (!idEmpleado) {
+            return res.status(400).json({
+                message: 'El ID del empleado no es valido'
+            });
+        }
+
         const usuarioExistente = await prisma.usuario.findUnique({
-            where: { id: Number(id) },
+            where: { id: idEmpleado },
             include: {
                 persona: {
                     include: { direccion: true }
@@ -348,6 +421,32 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
             return res.status(404).json({
                 message: 'Empleado no encontrado'
             });
+        }
+
+        if (!usuarioExistente.activo) {
+            return res.status(400).json({
+                message: 'Este empleado esta desactivado, no se puede modificar'
+            });
+        }
+
+        if (body.sucursal_id !== undefined) {
+            const sucursalIdNum = Number(body.sucursal_id);
+
+            if (!Number.isInteger(sucursalIdNum)) {
+                return res.status(400).json({
+                    message: 'sucursal_id debe ser un numero valido'
+                });
+            }
+
+            const sucursalEncontrada = await prisma.sucursal.findFirst({
+                where: { id: sucursalIdNum, deletedAt: null }
+            });
+
+            if (!sucursalEncontrada) {
+                return res.status(404).json({
+                    message: 'La sucursal especificada no existe'
+                });
+            }
         }
 
         const empleadoActualizado = await prisma.$transaction(async (tx) => {
@@ -372,7 +471,7 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
             if (body.nombre !== undefined) personaData.nombre = body.nombre;
             if (body.apellido_paterno !== undefined) personaData.apellidoPaterno = body.apellido_paterno;
             if (body.apellido_materno !== undefined) personaData.apellidoMaterno = body.apellido_materno;
-            if (body.fecha_nacimiento !== undefined) personaData.fechaNacimiento = body.fecha_nacimiento;
+            if (body.fecha_nacimiento !== undefined) personaData.fechaNacimiento = new Date(body.fecha_nacimiento);
             if (body.telefono !== undefined) personaData.telefono = body.telefono;
             if (body.genero !== undefined) personaData.genero = body.genero;
 
@@ -392,7 +491,7 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
             }
 
             return await tx.usuario.findUnique({
-                where: { id: Number(id) },
+                where: { id: idEmpleado },
                 include: {
                     rol: true,
                     persona: {
@@ -411,7 +510,7 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
             status: 'SUCCESS',
             req,
             details: {
-                usuarioId: Number(id),
+                usuarioId: idEmpleado,
                 username: usuarioExistente.username,
                 cambios: body
             }
@@ -437,8 +536,7 @@ export const modificarEmpleado = async (req: Request, res: Response) => {
             }
         });
         return res.status(500).json({
-            message: 'Error al modificar al empleado',
-            error: error.message
+            message: 'Error al modificar al empleado'
         });
     }
 }
@@ -467,8 +565,7 @@ export const obtenerSucursalesSelector = async (req: Request, res: Response) => 
         });
     } catch (error: any) {
         return res.status(500).json({
-            message: 'Error al obtener sucursales',
-            error: error.message
+            message: 'Error al obtener sucursales'
         });
     }
 }

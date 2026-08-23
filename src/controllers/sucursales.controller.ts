@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { registerAudit } from "../services/audit.service";
 
+const CODIGO_POSTAL_REGEX = /^\d{5}$/;
+
 //#region Obtener Sucursales
 // Obtener todas las sucursales
 export const getSucursales = async (
@@ -121,6 +123,14 @@ export const createSucursal = async (
       return;
     }
 
+    if (!CODIGO_POSTAL_REGEX.test(String(codigo_postal))) {
+      res.status(400).json({
+        success: false,
+        message: "El codigo_postal debe tener 5 digitos",
+      });
+      return;
+    }
+
     const resultado = await prisma.$transaction(async (tx) => {
       // Crear dirección
       const nuevaDireccion = await tx.direccion.create({
@@ -217,6 +227,22 @@ export const updateSucursal = async (
       numero_interior,
       referencia,
     } = req.body;
+
+    if (nombre !== undefined && String(nombre).trim().length === 0) {
+      res.status(400).json({
+        success: false,
+        message: "El nombre no puede estar vacio",
+      });
+      return;
+    }
+
+    if (codigo_postal !== undefined && !CODIGO_POSTAL_REGEX.test(String(codigo_postal))) {
+      res.status(400).json({
+        success: false,
+        message: "El codigo_postal debe tener 5 digitos",
+      });
+      return;
+    }
 
     const resultado = await prisma.$transaction(async (tx) => {
       const sucursal = await tx.sucursal.findFirst({
@@ -366,6 +392,20 @@ export const deleteSucursal = async (
       res.status(404).json({
         success: false,
         message: "Sucursal no encontrada",
+      });
+      return;
+    }
+
+    const [empleadosActivos, distribuidorasActivas] = await Promise.all([
+      prisma.empleado.count({ where: { sucursalId: id, deletedAt: null } }),
+      prisma.distribuidora.count({ where: { sucursalId: id, deletedAt: null } }),
+    ]);
+
+    if (empleadosActivos > 0 || distribuidorasActivas > 0) {
+      res.status(400).json({
+        success: false,
+        message:
+          "No se puede eliminar la sucursal porque todavia tiene empleados o distribuidoras activos asignados",
       });
       return;
     }
