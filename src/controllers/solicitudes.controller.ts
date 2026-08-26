@@ -8,6 +8,14 @@ import { parseId, parsePagination, isValidEmail } from "../utils/validation";
 const MAX_ITEMS_ARRAY = 20;
 const PASSWORD_MIN_LENGTH = 8;
 
+function generarCuentaBancariaAleatoria(): string {
+    let cuenta = '';
+    for (let i = 0; i < 18; i++) {
+        cuenta += Math.floor(Math.random() * 10).toString();
+    }
+    return cuenta;
+}
+
 //#region Crear Presolicitud
 export const crearPresolicitud = async (req: Request, res: Response) => {
     const {
@@ -483,7 +491,8 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
                         limiteCredito: 10000.00,
                         creditoUsado: 0.00,
                         cantidadLiquidada: 0.00,
-                        categoria: 'Cobre'
+                        categoria: 'Plata',
+                        cuentaBancaria: generarCuentaBancariaAleatoria()
                     }
                 });
 

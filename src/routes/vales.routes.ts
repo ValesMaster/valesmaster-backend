@@ -17,7 +17,7 @@ router.get('/detalle/:id', verifyToken, requireRole('distribuidora', 'cajero', '
 router.get('/prevales/obtener', verifyToken, requireRole('distribuidora', 'coordinador', 'gerente_general', 'gerente_sucursal'), obtenerPrevales);
 router.get('/prevales/detalle/:id', verifyToken, requireRole('distribuidora', 'coordinador', 'gerente_general', 'gerente_sucursal'), obtenerDetallePrevale);
 router.post('/pagos/registrar/:id', verifyToken, requireRole('cajero'), registrarPago);
-router.post('/pagos-distribuidora/registrar/:id', verifyToken, requireRole('coordinador'), registrarPagoDistribuidora);
+router.post('/pagos-distribuidora/registrar/:id', verifyToken, requireRole('coordinador', 'cajero'), registrarPagoDistribuidora);
 router.get('/conciliaciones/pagos', requireVpn, verifyToken, requireRole('cajero', 'gerente_general', 'gerente_sucursal'), obtenerConciliacionPagos);
 router.get('/conciliaciones/pagos-distribuidora', requireVpn, verifyToken, requireRole('cajero', 'gerente_general', 'gerente_sucursal'), obtenerConciliacionPagosDistribuidora);
 
