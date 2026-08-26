@@ -7,12 +7,14 @@ const ESTADOS_APROBACION_PERMITIDOS = ['APROBADO', 'RECHAZADO'];
 const PLAZOS_MAXIMO = 24;
 
 const COMISION_POR_CATEGORIA: Record<string, number> = {
-    'Cobre': 0.03,
+    'Cobre': 0.06,
     'Plata': 0.06,
     'Oro': 0.10
 };
 
-const PORCENTAJE_SEGURO = 0.02;
+const MONTO_SEGURO_FIJO = 100;
+const PORCENTAJE_COMISION_AGREGADA = 0.10;
+const PORCENTAJE_INTERES_QUINCENAL = 0.05;
 const MULTA_ATRASO = 300;
 const MONTO_REFERENCIA_PUNTOS = 100;
 const CUENTA_EMPRESA_PLACEHOLDER = '000000000000000000';
@@ -241,8 +243,14 @@ export const aprobarPrevale = async (req: Request, res: Response) => {
             });
         }
 
+        // gananciaDistribuidora: lo que se queda la distribuidora (segun su categoria), no se suma al total del vale,
+        // solo se resta del pago del cliente para saber cuanto le toca regresar a la empresa en cada quincena.
         const gananciaDistribuidora = Math.round(cantidadSolicitada * porcentajeComision * 100) / 100;
-        const montoSeguro = Math.round(cantidadSolicitada * PORCENTAJE_SEGURO * 100) / 100;
+
+        // montoComisionAgregada: comision fija de la empresa (10%), igual para todas las distribuidoras sin importar categoria.
+        const montoSeguro = MONTO_SEGURO_FIJO;
+        const montoComisionAgregada = Math.round(cantidadSolicitada * PORCENTAJE_COMISION_AGREGADA * 100) / 100;
+        const montoInteres = Math.round((cantidadSolicitada * prevale.plazos * PORCENTAJE_INTERES_QUINCENAL) * 100) / 100;
 
         if (!prevale.distribuidora.cuentaBancaria) {
             return res.status(400).json({
@@ -250,11 +258,10 @@ export const aprobarPrevale = async (req: Request, res: Response) => {
             });
         }
 
-        const capitalPorPago = Math.round((cantidadSolicitada / prevale.plazos) * 100) / 100;
-        const seguroPorPago = Math.round((montoSeguro / prevale.plazos) * 100) / 100;
-        const cantidadPorPagoNormal = Math.round((capitalPorPago + seguroPorPago) * 100) / 100;
+        const montoTotalVale = Math.round((cantidadSolicitada + montoComisionAgregada + montoSeguro + montoInteres) * 100) / 100;
+        const cantidadPorPagoNormal = Math.round((montoTotalVale / prevale.plazos) * 100) / 100;
 
-        const montoTotalARegresarEmpresa = cantidadSolicitada - gananciaDistribuidora + montoSeguro;
+        const montoTotalARegresarEmpresa = Math.round((montoTotalVale - gananciaDistribuidora) * 100) / 100;
         const cuotaPagoDistribuidora = Math.round((montoTotalARegresarEmpresa / prevale.plazos) * 100) / 100;
 
         const resultadoAprobacion = await prisma.$transaction(async (tx) => {
@@ -683,9 +690,31 @@ export const obtenerDetalleVale = async (req: Request, res: Response) => {
             }
         }
 
+        const capitalPrestado = Number(vale.cantidadPrestada);
+        const montoSeguro = Number(vale.montoSeguro);
+        const gananciaDistribuidoraTotal = Number(vale.gananciaDistribuidora);
+        const montoComisionAgregada = Math.round(capitalPrestado * PORCENTAJE_COMISION_AGREGADA * 100) / 100;
+        const montoInteres = Math.round((capitalPrestado * vale.plazos * PORCENTAJE_INTERES_QUINCENAL) * 100) / 100;
+        const montoTotalVale = Math.round((capitalPrestado + montoComisionAgregada + montoSeguro + montoInteres) * 100) / 100;
+        const cantidadPorPagoCliente = Math.round((montoTotalVale / vale.plazos) * 100) / 100;
+        const gananciaDistribuidoraPorPago = Math.round((gananciaDistribuidoraTotal / vale.plazos) * 100) / 100;
+        const montoARegresarEmpresaPorPago = Math.round((cantidadPorPagoCliente - gananciaDistribuidoraPorPago) * 100) / 100;
+
+        const desglose = {
+            capitalPrestado,
+            montoSeguro,
+            montoComisionAgregada,
+            montoInteres,
+            montoTotalVale,
+            cantidadPorPagoCliente,
+            gananciaDistribuidoraTotal,
+            gananciaDistribuidoraPorPago,
+            montoARegresarEmpresaPorPago
+        };
+
         return res.status(200).json({
             message: "Detalle de vale obtenido con exito",
-            data: vale
+            data: { ...vale, desglose }
         });
     } catch (error: any) {
         console.error("Error al obtener el detalle del vale: ", error);
@@ -913,11 +942,11 @@ export const registrarPagoDistribuidora = async (req: Request, res: Response) =>
             });
         }
 
-        const empleadoCoordinador = await prisma.empleado.findFirst({
+        const empleadoActual = await prisma.empleado.findFirst({
             where: { usuarioId: req.user!.id }
         });
 
-        if (!empleadoCoordinador) {
+        if (!empleadoActual) {
             return res.status(404).json({
                 message: "No se encontro un empleado asociado al usuario en sesion"
             });
@@ -926,13 +955,19 @@ export const registrarPagoDistribuidora = async (req: Request, res: Response) =>
         const pagoDistribuidora = await prisma.pagosDistribuidora.findUnique({
             where: { id: idPagoDistribuidora },
             include: {
-                credito: true
+                credito: { include: { distribuidora: true } }
             }
         });
 
         if (!pagoDistribuidora) {
             return res.status(404).json({
                 message: "Pago de distribuidora no encontrado"
+            });
+        }
+
+        if (req.user!.rol === 'cajero' && pagoDistribuidora.credito.distribuidora.sucursalId !== empleadoActual.sucursalId) {
+            return res.status(403).json({
+                message: "No tiene permiso para registrar pagos de distribuidoras de otra sucursal"
             });
         }
 

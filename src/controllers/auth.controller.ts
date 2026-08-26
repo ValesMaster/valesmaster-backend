@@ -100,16 +100,6 @@ export const registerTest = async (req: Request, res: Response) => {
         })
     } catch (error: any) {
         console.error('Error en el registro:', error);
-
-        if (error.code === 'P2002') {
-            const target = error.meta?.target;
-            const fields = Array.isArray(target) ? target.join(', ') : 'desconocido';
-
-            return res.status(409).json({
-                message: `Error de duplicidad: El campo (${fields}) ya está registrado en el sistema.`
-            });
-        }
-
         return res.status(500).json({ message: 'Error interno del servidor al registrar el usuario' });
     }
 }
