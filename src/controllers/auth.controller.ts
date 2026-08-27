@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma, { prismaRead } from '../lib/prisma';
+import { registerAudit } from '../services/audit.service';
 
 //#region Register Test
 // ESTE METODO DE REGISTRO ES PARA CREAR USUARIOS PARA PROBAR LAS FASES DE LOGIN
@@ -27,61 +28,92 @@ export const registerTest = async (req: Request, res: Response) => {
             })
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        const newUser = await prisma.usuario.create({
-            data: {
-                email,
-                username,
-                password: hashedPassword,
-                rol: {
-                    connect: { id: rolId }
-                },
-                persona: {
-                    create: {
-                        nombre: nombres,
-                        apellidoPaterno,
-                        apellidoMaterno,
-                        fechaNacimiento: new Date(fechaNacimiento),
-                        genero,
-                        curp,
-                        rfc,
-                        telefono,
-                        ine,
-                        direccion: {
-                            create: {
-                                estado,
-                                municipio,
-                                colonia,
-                                codigoPostal,
-                                calle,
-                                numeroExterior,
-                                referencia
-                            }
-                        }
-                    }
-                }
-            },
-            include: {
-                rol: true,
-                persona: true
-            }
-        });
-
         if (rolExiste.cantidadMfa === 3) {
-            for (const item of securityQuestions) {
-                const answerHash = await bcrypt.hash(item.answer, 10);
-                await prisma.securityQuestion.create({
-                    data: {
-                        userId: newUser.id,
-                        question: item.question,
-                        answerHash
+            if (!Array.isArray(securityQuestions) || securityQuestions.length === 0) {
+                return res.status(400).json({
+                    message: 'securityQuestions es obligatorio para este rol y debe ser un arreglo con al menos una pregunta'
+                });
+            }
 
-                    }
+            const itemInvalido = securityQuestions.some((item: any) => !item?.question || !item?.answer);
+            if (itemInvalido) {
+                return res.status(400).json({
+                    message: "Cada pregunta de seguridad debe incluir 'question' y 'answer'"
                 });
             }
         }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const newUser = await prisma.$transaction(async (tx) => {
+            const usuarioCreado = await tx.usuario.create({
+                data: {
+                    email,
+                    username,
+                    password: hashedPassword,
+                    rol: {
+                        connect: { id: rolId }
+                    },
+                    persona: {
+                        create: {
+                            nombre: nombres,
+                            apellidoPaterno,
+                            apellidoMaterno,
+                            fechaNacimiento: new Date(fechaNacimiento),
+                            genero,
+                            curp,
+                            rfc,
+                            telefono,
+                            ine,
+                            direccion: {
+                                create: {
+                                    estado,
+                                    municipio,
+                                    colonia,
+                                    codigoPostal,
+                                    calle,
+                                    numeroExterior,
+                                    referencia
+                                }
+                            }
+                        }
+                    }
+                },
+                include: {
+                    rol: true,
+                    persona: true
+                }
+            });
+
+            if (rolExiste.cantidadMfa === 3) {
+                for (const item of securityQuestions) {
+                    const answerHash = await bcrypt.hash(item.answer, 10);
+                    await tx.securityQuestion.create({
+                        data: {
+                            userId: usuarioCreado.id,
+                            question: item.question,
+                            answerHash
+                        }
+                    });
+                }
+            }
+
+            return usuarioCreado;
+        });
+
+        registerAudit({
+            action: 'REGISTRO_USUARIO',
+            module: 'AUTH',
+            status: 'SUCCESS',
+            req,
+            details: {
+                usuarioId: newUser.id,
+                username: newUser.username,
+                email: newUser.email,
+                rol: newUser.rol.nombre
+            }
+        });
 
         return res.status(201).json({
             message: 'Usuario registrado correctemente',
@@ -100,6 +132,19 @@ export const registerTest = async (req: Request, res: Response) => {
         })
     } catch (error: any) {
         console.error('Error en el registro:', error);
+
+        registerAudit({
+            action: 'REGISTRO_USUARIO',
+            module: 'AUTH',
+            status: 'FAILED',
+            req,
+            details: {
+                email: req.body?.email,
+                username: req.body?.username,
+                error: error.message
+            }
+        });
+
         return res.status(500).json({ message: 'Error interno del servidor al registrar el usuario' });
     }
 }

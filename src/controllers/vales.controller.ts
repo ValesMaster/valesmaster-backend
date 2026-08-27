@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma, { prismaRead } from "../lib/prisma";
 import { parseId, parsePagination } from "../utils/validation";
+import { registerAudit } from "../services/audit.service";
 
 const TIPOS_VALE_PERMITIDOS = ['EFECTIVO', 'MERCANCIA'];
 const ESTADOS_APROBACION_PERMITIDOS = ['APROBADO', 'RECHAZADO'];
@@ -138,12 +139,40 @@ export const crearPrevale = async (req: Request, res: Response) => {
             });
         });
 
+        registerAudit({
+            action: 'CREAR_PREVALE',
+            module: 'VALES',
+            status: 'SUCCESS',
+            req,
+            details: {
+                prevaleId: nuevoPrevale?.id,
+                distribuidoraId: distribuidora.id,
+                clienteId: clienteExistente.id,
+                cantidadSolicitada: cantidadSolicitadaNum,
+                plazos: plazosNum
+            }
+        });
+
         return res.status(201).json({
             message: "Prevale creado con exito",
             data: nuevoPrevale
         });
     } catch (error: any) {
         console.error("Error al crear el prevale: ", error);
+
+        registerAudit({
+            action: 'CREAR_PREVALE',
+            module: 'VALES',
+            status: 'FAILED',
+            req,
+            details: {
+                cliente_id,
+                cantidad_solicitada,
+                plazos,
+                error: error.message
+            }
+        });
+
         return res.status(500).json({
             message: "Error al crear el prevale"
         });
@@ -213,6 +242,17 @@ export const aprobarPrevale = async (req: Request, res: Response) => {
                     estado: 'RECHAZADO',
                     motivoRechazo: motivo_rechazo,
                     coordinadorId: empleadoCoordinador.id
+                }
+            });
+
+            registerAudit({
+                action: 'RECHAZAR_PREVALE',
+                module: 'VALES',
+                status: 'SUCCESS',
+                req,
+                details: {
+                    prevaleId: prevale.id,
+                    motivo_rechazo
                 }
             });
 
@@ -344,12 +384,39 @@ export const aprobarPrevale = async (req: Request, res: Response) => {
             return nuevoVale;
         });
 
+        registerAudit({
+            action: 'APROBAR_PREVALE',
+            module: 'VALES',
+            status: 'SUCCESS',
+            req,
+            details: {
+                prevaleId: prevale.id,
+                valeId: resultadoAprobacion.id,
+                distribuidoraId: prevale.distribuidoraId,
+                cantidadSolicitada,
+                montoTotalVale
+            }
+        });
+
         return res.status(200).json({
             message: "Prevale aprobado y vale creado con exito",
             data: resultadoAprobacion
         });
     } catch (error: any) {
         console.error("Error al aprobar el prevale: ", error);
+
+        registerAudit({
+            action: 'APROBAR_PREVALE',
+            module: 'VALES',
+            status: 'FAILED',
+            req,
+            details: {
+                prevaleId: parseId(id),
+                estado,
+                error: error.message
+            }
+        });
+
         return res.status(500).json({
             message: "Error al aprobar el prevale"
         });
@@ -899,6 +966,20 @@ export const registrarPago = async (req: Request, res: Response) => {
             return { pagoActualizado, totalRegistrado };
         });
 
+        registerAudit({
+            action: 'REGISTRAR_PAGO',
+            module: 'VALES',
+            status: 'SUCCESS',
+            req,
+            details: {
+                pagoId: pago.id,
+                valeId: pago.valeId,
+                totalCobrado: resultado.totalRegistrado,
+                atrasoAnteriorIncluido: huboAtrasoAnterior,
+                puntosGanados
+            }
+        });
+
         return res.status(200).json({
             message: "Pago registrado con exito",
             data: {
@@ -915,6 +996,18 @@ export const registrarPago = async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         console.error("Error al registrar el pago: ", error);
+
+        registerAudit({
+            action: 'REGISTRAR_PAGO',
+            module: 'VALES',
+            status: 'FAILED',
+            req,
+            details: {
+                pagoId: parseId(id),
+                error: error.message
+            }
+        });
+
         return res.status(500).json({
             message: "Error al registrar el pago"
         });
@@ -1022,6 +1115,20 @@ export const registrarPagoDistribuidora = async (req: Request, res: Response) =>
             return pagoActualizado;
         });
 
+        registerAudit({
+            action: 'REGISTRAR_PAGO_DISTRIBUIDORA',
+            module: 'VALES',
+            status: 'SUCCESS',
+            req,
+            details: {
+                pagoDistribuidoraId: pagoDistribuidora.id,
+                creditoId: credito.id,
+                distribuidoraId: credito.distribuidoraId,
+                capitalLiberado: capitalPorCuota,
+                metodo_pago
+            }
+        });
+
         return res.status(200).json({
             message: "Pago a la empresa registrado con exito",
             data: {
@@ -1031,6 +1138,18 @@ export const registrarPagoDistribuidora = async (req: Request, res: Response) =>
         });
     } catch (error: any) {
         console.error("Error al registrar el pago de la distribuidora: ", error);
+
+        registerAudit({
+            action: 'REGISTRAR_PAGO_DISTRIBUIDORA',
+            module: 'VALES',
+            status: 'FAILED',
+            req,
+            details: {
+                pagoDistribuidoraId: parseId(id),
+                error: error.message
+            }
+        });
+
         return res.status(500).json({
             message: "Error al registrar el pago de la distribuidora"
         });
@@ -1038,7 +1157,7 @@ export const registrarPagoDistribuidora = async (req: Request, res: Response) =>
 }
 //#endregion
 
-//#region Conciliacion Pagos (Cliente -> Distribuidora)
+//#region Conciliacion Pagos 
 export const obtenerConciliacionPagos = async (req: Request, res: Response) => {
     try {
         const { page, limit, distribuidora_id } = req.query;
@@ -1115,7 +1234,7 @@ export const obtenerConciliacionPagos = async (req: Request, res: Response) => {
 }
 //#endregion
 
-//#region Conciliacion Pagos Distribuidora (Distribuidora -> Empresa)
+//#region Conciliacion Pagos Distribuidora 
 export const obtenerConciliacionPagosDistribuidora = async (req: Request, res: Response) => {
     try {
         const { page, limit, distribuidora_id } = req.query;

@@ -360,11 +360,33 @@ export const modificarCliente = async (req: Request, res: Response) => {
             });
         });
 
+        registerAudit({
+            action: 'MODIFICAR_CLIENTE',
+            module: 'CLIENTES',
+            status: 'SUCCESS',
+            req,
+            details: {
+                clienteId: idCliente,
+                cambios: body
+            }
+        });
+
         return res.status(200).json({
             message: 'Cliente actualizado con exito',
             data: clienteActualizado
         });
     } catch (error: any) {
+        registerAudit({
+            action: 'MODIFICAR_CLIENTE',
+            module: 'CLIENTES',
+            status: 'FAILED',
+            req,
+            details: {
+                clienteId: parseId(id),
+                error: error.message
+            }
+        });
+
         return res.status(500).json({
             message: 'Error al modificar cliente'
         });
@@ -409,11 +431,32 @@ export const eliminarCliente = async (req: Request, res: Response) => {
             }
         });
 
+        registerAudit({
+            action: 'ELIMINAR_CLIENTE',
+            module: 'CLIENTES',
+            status: 'SUCCESS',
+            req,
+            details: {
+                clienteId: idCliente
+            }
+        });
+
         return res.status(200).json({
             message: 'Cliente desactivado correctamente',
             data: clienteDesactivado
         });
     } catch (error: any) {
+        registerAudit({
+            action: 'ELIMINAR_CLIENTE',
+            module: 'CLIENTES',
+            status: 'FAILED',
+            req,
+            details: {
+                clienteId: parseId(id),
+                error: error.message
+            }
+        });
+
         return res.status(500).json({
             message: 'Error al desactivar al cliente'
         })

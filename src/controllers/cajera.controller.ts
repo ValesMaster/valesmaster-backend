@@ -69,6 +69,18 @@ export const canjearPuntos = async (req: Request, res: Response) => {
             data: nuevoCanje
         });
     } catch (error: any) {
+        registerAudit({
+            action: 'CANJE_PUNTOS',
+            module: 'CAJERA',
+            status: 'FAILED',
+            req,
+            details: {
+                distribuidoraId: id_distribuidora,
+                cantidad_canjeada,
+                error: error.message
+            }
+        });
+
         return res.status(500).json({
             message: 'Error al realizar el canje de puntos'
         });

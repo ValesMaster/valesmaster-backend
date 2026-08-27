@@ -4,6 +4,7 @@ import prisma, { prismaRead } from "../lib/prisma";
 import path from "path";
 import fs from "fs";
 import { parseId, parsePagination, isValidEmail } from "../utils/validation";
+import { registerAudit } from "../services/audit.service";
 
 const MAX_ITEMS_ARRAY = 20;
 const PASSWORD_MIN_LENGTH = 8;
@@ -262,12 +263,35 @@ export const crearPresolicitud = async (req: Request, res: Response) => {
             return presolicitud;
         });
 
+        registerAudit({
+            action: 'CREAR_PRESOLICITUD',
+            module: 'SOLICITUDES',
+            status: 'SUCCESS',
+            req,
+            details: {
+                presolicitudId: nuevaPresolicitud.id,
+                folio: nuevaPresolicitud.folio,
+                sucursalId: nuevaPresolicitud.sucursalId
+            }
+        });
+
         return res.status(201).json({
             message: "Presolicitud creada con exito",
             data: nuevaPresolicitud
         });
     } catch (error: any) {
         console.error("Error al crear la presolicitud: ", error);
+
+        registerAudit({
+            action: 'CREAR_PRESOLICITUD',
+            module: 'SOLICITUDES',
+            status: 'FAILED',
+            req,
+            details: {
+                error: error.message
+            }
+        });
+
         return res.status(500).json({
             message: "Error al crear la presolicitud"
         });
@@ -359,12 +383,37 @@ export const validarPresolicitud = async (req: Request, res: Response) => {
             ? 'Solicitud validada con exito'
             : 'Solicitud rechazada con exito';
 
+        registerAudit({
+            action: 'VALIDAR_PRESOLICITUD',
+            module: 'SOLICITUDES',
+            status: 'SUCCESS',
+            req,
+            details: {
+                presolicitudId: idPresolicitud,
+                estado,
+                solicitudId: resultadoTransaccion.nuevaSolicitud?.id
+            }
+        });
+
         return res.status(200).json({
             message: mensaje,
             data: resultadoTransaccion
         });
     } catch (error: any) {
         console.error("Error al validar presolicitud: ", error)
+
+        registerAudit({
+            action: 'VALIDAR_PRESOLICITUD',
+            module: 'SOLICITUDES',
+            status: 'FAILED',
+            req,
+            details: {
+                presolicitudId: parseId(id),
+                estado,
+                error: error.message
+            }
+        });
+
         res.status(500).json({
             message: "Error al validar presolicitud"
         });
@@ -545,6 +594,19 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
                 };
             });
 
+            registerAudit({
+                action: 'APROBAR_SOLICITUD',
+                module: 'SOLICITUDES',
+                status: 'SUCCESS',
+                req,
+                details: {
+                    solicitudId: idSolicitud,
+                    distribuidoraId: resultadoAprobacion.nuevaDistribuidora.id,
+                    usuarioId: resultadoAprobacion.usuarioDistribuidora.id,
+                    username: resultadoAprobacion.usuarioDistribuidora.username
+                }
+            });
+
             return res.status(200).json({
                 message: "Distribuidora aprobada y creada con exito",
                 data: resultadoAprobacion
@@ -558,6 +620,16 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
                 }
             });
 
+            registerAudit({
+                action: 'RECHAZAR_SOLICITUD',
+                module: 'SOLICITUDES',
+                status: 'SUCCESS',
+                req,
+                details: {
+                    solicitudId: idSolicitud
+                }
+            });
+
             return res.status(200).json({
                 message: 'Solicitud rechazada con exito',
                 data: solicitudRechazada
@@ -566,6 +638,19 @@ export const aprobarSolicitud = async (req: Request, res: Response) => {
 
     } catch (error: any) {
         console.error("Error al aprobar solicitud: ", error);
+
+        registerAudit({
+            action: 'APROBAR_SOLICITUD',
+            module: 'SOLICITUDES',
+            status: 'FAILED',
+            req,
+            details: {
+                solicitudId: parseId(id),
+                estado,
+                error: error.message
+            }
+        });
+
         return res.status(500).json({
             message: "Error al aprobar presolicitud"
         });
