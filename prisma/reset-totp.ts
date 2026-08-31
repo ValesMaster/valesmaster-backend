@@ -1,5 +1,7 @@
-// Script de mantenimiento: resetea el TOTP de un usuario para forzar que
-// la proxima vez que inicie sesion tenga que volver a escanear el QR.
+// Script de mantenimiento: resetea el MFA completo de un usuario (TOTP y
+// preguntas de seguridad) para forzar que la proxima vez que inicie sesion
+// tenga que configurar todo de nuevo desde cero (escanear QR + registrar
+// preguntas de seguridad).
 //
 // Uso:
 //   npx tsx prisma/reset-totp.ts <username_o_email>
@@ -36,14 +38,19 @@ async function main() {
         where: { userId: usuario.id }
     });
 
+    const preguntasEliminadas = await prisma.securityQuestion.deleteMany({
+        where: { userId: usuario.id }
+    });
+
     console.log(`Usuario encontrado: ${usuario.username} (${usuario.email}), rol: ${usuario.rol.nombre}`);
     console.log(`TotpSecrets eliminados: ${secretosEliminados.count}`);
-    console.log('Listo. En el siguiente login a este usuario le va a pedir escanear el QR de nuevo.');
+    console.log(`SecurityQuestions eliminadas: ${preguntasEliminadas.count}`);
+    console.log('Listo. En el siguiente login a este usuario le va a pedir escanear el QR y registrar preguntas de seguridad desde cero.');
 }
 
 main()
     .catch((e) => {
-        console.error('Error al resetear el TOTP:', e);
+        console.error('Error al resetear el MFA:', e);
         process.exit(1);
     })
     .finally(async () => {
