@@ -72,6 +72,7 @@ securityQuestions    SecurityQuestion[]
 loginAttempts        LoginAttempt[]
 distribuidoras       Distribuidora[]
 empleados            Empleado[]
+solicitudesCambio    SolicitudCambio[] @relation("SolicitanteCambio")
 
   @@map("usuarios")
 }
@@ -181,6 +182,7 @@ model Empleado {
   gerenteSol         Solicitud[]    @relation("GerenteSol")
   canjesPuntos       CanjePuntos[]
   coordinadorPrevale Prevale[]      @relation("CoordinadorPrevale")
+  coordinadorCambios SolicitudCambio[] @relation("CoordinadorCambio")
 
   @@map("empleados")
 }
@@ -552,4 +554,31 @@ model PagosDistribuidora {
   credito Credito @relation(fields: [relacionId], references: [id])
 
   @@map("pagos_distribuidoras")
+}
+
+// Cola generica de autorizacion: cuando alguien que no es coordinador ni
+// gerente_general pide modificar/eliminar un registro protegido, en vez de
+// aplicarse directo se guarda aqui pendiente hasta que un coordinador la
+// apruebe o la rechace. "entidad" identifica el modelo (ej. "CLIENTE") y
+// "entidadId" el registro afectado; no es una relacion de Prisma porque
+// puede apuntar a distintas tablas segun "entidad".
+model SolicitudCambio {
+  id            Int       @id @default(autoincrement())
+  entidad       String    @db.VarChar(50)
+  entidadId     Int       @map("entidad_id")
+  tipoAccion    String    @map("tipo_accion") @db.VarChar(20)
+  cambios       Json
+  solicitanteId Int       @map("solicitante_id")
+  coordinadorId Int?      @map("coordinador_id")
+  estado        String    @db.VarChar(20)
+  motivoRechazo String?   @map("motivo_rechazo") @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  solicitante Usuario   @relation("SolicitanteCambio", fields: [solicitanteId], references: [id])
+  coordinador Empleado? @relation("CoordinadorCambio", fields: [coordinadorId], references: [id])
+
+  @@map("solicitudes_cambio")
 }

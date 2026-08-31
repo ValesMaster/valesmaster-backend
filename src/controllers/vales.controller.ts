@@ -779,9 +779,63 @@ export const obtenerDetalleVale = async (req: Request, res: Response) => {
             montoARegresarEmpresaPorPago
         };
 
+        // Para cada pago PENDIENTE, se calcula por adelantado cuanto costaria
+        // pagarlo hoy (sin modificar nada en la base), replicando exactamente
+        // las reglas de registrarPago: si la quincena anterior sigue
+        // PENDIENTE y ya vencio, pagar esta tambien arrastra esa quincena
+        // anterior mas la multa fija.
+        const hoy = new Date();
+        const hoyStr = soloFecha(hoy);
+
+        const pagosConEstimado = vale.pagos.map((pago) => {
+            if (pago.estado !== 'PENDIENTE') {
+                return { ...pago, estimado: null };
+            }
+
+            const pagoAnterior = vale.pagos.find((p) => p.quincena === pago.quincena - 1) ?? null;
+
+            const hayAtrasoMasAntiguoSinResolver = vale.pagos.some(
+                (p) => p.quincena < pago.quincena - 1 && p.estado === 'PENDIENTE'
+            );
+
+            const incluyeAtrasoAnterior = !!pagoAnterior
+                && pagoAnterior.estado === 'PENDIENTE'
+                && soloFecha(pagoAnterior.fechaCorte) < hoyStr;
+
+            const anteriorPendienteSinVencer = !!pagoAnterior
+                && pagoAnterior.estado === 'PENDIENTE'
+                && !incluyeAtrasoAnterior;
+
+            const pagable = !hayAtrasoMasAntiguoSinResolver && !anteriorPendienteSinVencer;
+
+            const multaEstimada = incluyeAtrasoAnterior ? MULTA_ATRASO : 0;
+            const montoPagoAnterior = incluyeAtrasoAnterior ? Number(pagoAnterior!.cantidadAPagar) : 0;
+            const montoSiSePagaHoy = Math.round((Number(pago.cantidadAPagar) + montoPagoAnterior + multaEstimada) * 100) / 100;
+
+            let tipoComportamientoEstimado: string;
+            if (hoyStr < soloFecha(pago.fechaCorte)) {
+                tipoComportamientoEstimado = 'ANTICIPADO';
+            } else if (hoyStr === soloFecha(pago.fechaCorte)) {
+                tipoComportamientoEstimado = 'PUNTUAL';
+            } else {
+                tipoComportamientoEstimado = 'ATRASADO';
+            }
+
+            return {
+                ...pago,
+                estimado: {
+                    pagable,
+                    incluyeAtrasoAnterior,
+                    multaEstimada,
+                    montoSiSePagaHoy,
+                    tipoComportamientoEstimado
+                }
+            };
+        });
+
         return res.status(200).json({
             message: "Detalle de vale obtenido con exito",
-            data: { ...vale, desglose }
+            data: { ...vale, pagos: pagosConEstimado, desglose }
         });
     } catch (error: any) {
         console.error("Error al obtener el detalle del vale: ", error);

@@ -3,6 +3,15 @@ import prisma, { prismaRead } from "../lib/prisma";
 import { registerAudit } from "../services/audit.service";
 import { parseId, parsePagination } from "../utils/validation";
 
+const CAMPOS_MODIFICAR_CLIENTE = [
+    'nombre', 'apellido_paterno', 'apellido_materno', 'fecha_nacimiento', 'telefono', 'genero',
+    'estado', 'municipio', 'codigo_postal', 'colonia', 'calle', 'numero_exterior', 'numero_interior', 'referencia'
+];
+
+// Coordinador y gerente_general aplican sus cambios directo; cualquier otro
+// rol (por ahora, distribuidora) necesita autorizacion de un coordinador.
+const requiereAutorizacionDeCoordinador = (rol: string) => rol !== 'coordinador' && rol !== 'gerente_general';
+
 //#region Obtener Perfil
 export const obtenerPerfil = async (req: Request, res: Response) => {
     try {
@@ -317,6 +326,47 @@ export const modificarCliente = async (req: Request, res: Response) => {
             });
         }
 
+        if (requiereAutorizacionDeCoordinador(req.user!.rol)) {
+            const cambios: Record<string, any> = {};
+            for (const campo of CAMPOS_MODIFICAR_CLIENTE) {
+                if (body[campo] !== undefined) cambios[campo] = body[campo];
+            }
+
+            if (Object.keys(cambios).length === 0) {
+                return res.status(400).json({
+                    message: 'No se enviaron campos validos para modificar'
+                });
+            }
+
+            const solicitud = await prisma.solicitudCambio.create({
+                data: {
+                    entidad: 'CLIENTE',
+                    entidadId: idCliente,
+                    tipoAccion: 'MODIFICAR',
+                    cambios,
+                    solicitanteId: req.user!.id,
+                    estado: 'PENDIENTE'
+                }
+            });
+
+            registerAudit({
+                action: 'SOLICITAR_MODIFICAR_CLIENTE',
+                module: 'CLIENTES',
+                status: 'SUCCESS',
+                req,
+                details: {
+                    clienteId: idCliente,
+                    solicitudCambioId: solicitud.id,
+                    cambios
+                }
+            });
+
+            return res.status(202).json({
+                message: 'Solicitud de modificacion enviada, pendiente de autorizacion de un coordinador',
+                data: solicitud
+            });
+        }
+
         const clienteActualizado = await prisma.$transaction(async (tx) => {
             const direccionData: any = {};
             if (body.estado !== undefined) direccionData.estado = body.estado;
@@ -419,6 +469,35 @@ export const eliminarCliente = async (req: Request, res: Response) => {
         if (clienteExistente.estado === 'INACTIVO') {
             return res.status(400).json({
                 message: 'Este cliente ya se encuentra desactivado'
+            });
+        }
+
+        if (requiereAutorizacionDeCoordinador(req.user!.rol)) {
+            const solicitud = await prisma.solicitudCambio.create({
+                data: {
+                    entidad: 'CLIENTE',
+                    entidadId: idCliente,
+                    tipoAccion: 'ELIMINAR',
+                    cambios: {},
+                    solicitanteId: req.user!.id,
+                    estado: 'PENDIENTE'
+                }
+            });
+
+            registerAudit({
+                action: 'SOLICITAR_ELIMINAR_CLIENTE',
+                module: 'CLIENTES',
+                status: 'SUCCESS',
+                req,
+                details: {
+                    clienteId: idCliente,
+                    solicitudCambioId: solicitud.id
+                }
+            });
+
+            return res.status(202).json({
+                message: 'Solicitud de baja enviada, pendiente de autorizacion de un coordinador',
+                data: solicitud
             });
         }
 

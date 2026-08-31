@@ -6,13 +6,17 @@ import { registerAudit } from '../services/audit.service';
 
 //#region Register Test
 // ESTE METODO DE REGISTRO ES PARA CREAR USUARIOS PARA PROBAR LAS FASES DE LOGIN
+// Deja al usuario (y su Empleado, si el rol lo requiere) listo para intentar
+// iniciar sesion desde cero: no crea TotpSecret ni SecurityQuestion, asi que
+// el login lo va a mandar por el flujo completo (escanear QR + registrar
+// preguntas de seguridad) si su rol requiere 3 factores.
 export const registerTest = async (req: Request, res: Response) => {
     try {
         const {
-            email, username, password, rolId,
+            email, username, password, rolId, sucursal_id,
             nombres, apellidoPaterno, apellidoMaterno, fechaNacimiento,
             genero, curp, rfc, telefono, ine, estado, municipio, colonia,
-            codigoPostal, calle, numeroExterior, referencia, securityQuestions
+            codigoPostal, calle, numeroExterior, referencia
         } = req.body;
 
         if (!email || !username || !password || !rolId || !curp || !rfc) {
@@ -28,17 +32,27 @@ export const registerTest = async (req: Request, res: Response) => {
             })
         }
 
-        if (rolExiste.cantidadMfa === 3) {
-            if (!Array.isArray(securityQuestions) || securityQuestions.length === 0) {
+        // Todos los roles internos (todos menos 'distribuidora') necesitan un
+        // Empleado ligado a una sucursal para poder usar el resto de la API.
+        const requiereEmpleado = rolExiste.nombre !== 'distribuidora';
+        let sucursalIdNum: number | undefined;
+
+        if (requiereEmpleado) {
+            sucursalIdNum = Number(sucursal_id);
+
+            if (!sucursal_id || !Number.isInteger(sucursalIdNum)) {
                 return res.status(400).json({
-                    message: 'securityQuestions es obligatorio para este rol y debe ser un arreglo con al menos una pregunta'
+                    message: 'sucursal_id es obligatorio y debe ser un numero valido para este rol'
                 });
             }
 
-            const itemInvalido = securityQuestions.some((item: any) => !item?.question || !item?.answer);
-            if (itemInvalido) {
+            const sucursalExiste = await prisma.sucursal.findFirst({
+                where: { id: sucursalIdNum, deletedAt: null }
+            });
+
+            if (!sucursalExiste) {
                 return res.status(400).json({
-                    message: "Cada pregunta de seguridad debe incluir 'question' y 'answer'"
+                    message: 'La sucursal especificada no existe'
                 });
             }
         }
@@ -86,17 +100,13 @@ export const registerTest = async (req: Request, res: Response) => {
                 }
             });
 
-            if (rolExiste.cantidadMfa === 3) {
-                for (const item of securityQuestions) {
-                    const answerHash = await bcrypt.hash(item.answer, 10);
-                    await tx.securityQuestion.create({
-                        data: {
-                            userId: usuarioCreado.id,
-                            question: item.question,
-                            answerHash
-                        }
-                    });
-                }
+            if (requiereEmpleado) {
+                await tx.empleado.create({
+                    data: {
+                        sucursalId: sucursalIdNum!,
+                        usuarioId: usuarioCreado.id
+                    }
+                });
             }
 
             return usuarioCreado;
@@ -111,18 +121,20 @@ export const registerTest = async (req: Request, res: Response) => {
                 usuarioId: newUser.id,
                 username: newUser.username,
                 email: newUser.email,
-                rol: newUser.rol.nombre
+                rol: newUser.rol.nombre,
+                sucursalId: sucursalIdNum
             }
         });
 
         return res.status(201).json({
-            message: 'Usuario registrado correctemente',
+            message: 'Usuario registrado con exito, listo para iniciar sesion (le pedira escanear QR y registrar preguntas de seguridad si su rol lo requiere)',
             user: {
                 id: newUser.id,
                 email: newUser.email,
                 username: newUser.username,
                 rol: newUser.rol.nombre,
                 mfaRequerido: newUser.rol.cantidadMfa,
+                sucursalId: sucursalIdNum,
                 persona: {
                     nombreCompleto: `${newUser.persona.nombre} ${newUser.persona.apellidoPaterno} ${newUser.persona.apellidoMaterno}`,
                     curp: newUser.persona.curp,
